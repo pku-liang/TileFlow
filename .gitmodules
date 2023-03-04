@@ -1,3 +1,0 @@
-[submodule "3rdparty/timeloop"]
-	path = 3rdparty/timeloop
-	url = git@github.com:NVlabs/timeloop.git
