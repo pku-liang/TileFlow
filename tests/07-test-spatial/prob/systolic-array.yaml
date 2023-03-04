@@ -1,0 +1,23 @@
+problem:
+  shape: 
+    name: Systolic_Array
+    dimensions: [M,N,R] 
+    data-spaces:
+    - name: Out 
+      projection:
+        - [[M]] 
+        - [[N]] 
+      read-write: True 
+    - name: MA 
+      projection:
+        - [[M]]
+        - [[N], [R]]
+    - name: MB
+      projection:
+        - [[M], [R]]
+        - [[N]] 
+
+  instance: 
+    M: 4 
+    N: 4 
+    R: 12 

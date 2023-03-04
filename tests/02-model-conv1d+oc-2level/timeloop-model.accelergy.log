@@ -1,0 +1,41 @@
+    _                _                      
+   / \   ___ ___ ___| | ___ _ __ __ _ _   _ 
+  / _ \ / __/ __/ _ \ |/ _ \ '__/ _` | | | |
+ / ___ \ (_| (_|  __/ |  __/ | | (_| | |_| |
+/_/   \_\___\___\___|_|\___|_|  \__, |\__, |
+                                |___/ |___/ 
+
+Info: generating outputs according to the following specified output flags... 
+ Please use the -f flag to update the preference (default to all output files) 
+{'ERT': 1, 'ERT_summary': 1, 'ART': 1, 'ART_summary': 1, 'energy_estimation': 1, 'flattened_arch': 1}
+Info: config file located: /home/gulang2022/.config/accelergy/accelergy_config.yaml 
+config file content: 
+ {'compound_components': [], 'estimator_plug_ins': ['/home/gulang2022/.local/share/accelergy/estimation_plug_ins'], 'primitive_components': ['/home/gulang2022/.local/share/accelergy/primitive_component_libs'], 'table_plug_ins': {'roots': ['/home/gulang2022/.local/share/accelergy/estimation_plug_ins/accelergy-table-based-plug-ins/set_of_table_templates']}, 'version': 0.3}
+Warn: Cannot recognize the top key "problem" in file prob/conv1d+oc.prob.yaml 
+Warn: Cannot recognize the top key "mapping" in file map/conv1d+oc-2level-os-tiled.map.yaml 
+Info: Parsing file arch/2level.arch.yaml for architecture info 
+Info: Found non-numeric expression 40nm. Available bindings: {'technology': '40nm'} 
+WARN: Failed to evaluate "40nm". Setting System.technology="40nm". Available bindings: {'technology': '40nm'}
+Info: primitive component file parsed:  /home/gulang2022/.local/share/accelergy/primitive_component_libs/primitive_component.lib.yaml 
+Info: primitive component file parsed:  /home/gulang2022/.local/share/accelergy/primitive_component_libs/soc_primitives.lib.yaml 
+Info: primitive component file parsed:  /home/gulang2022/.local/share/accelergy/primitive_component_libs/pim_primitive_component.lib.yaml 
+Warn: No compound component classes specified, architecture can only contain primitive components 
+Info: Found non-numeric expression 5ns. Available bindings: {'depth': 67, 'width': 8, 'block-size': 1, 'word-bits': 8, 'technology': '40nm', 'n_ports': 2, 'latency': '5ns'} 
+WARN: Failed to evaluate "5ns". Setting System.PE.Buffer.latency="5ns". Available bindings: {'depth': 67, 'width': 8, 'block-size': 1, 'word-bits': 8, 'technology': '40nm', 'n_ports': 2, 'latency': '5ns'}
+Info: Calculated "n_banks" = 1 
+Info: estimator plug-in identified by:  /home/gulang2022/.local/share/accelergy/estimation_plug_ins/accelergy-cacti-plug-in/cacti.estimator.yaml 
+Info: estimator plug-in identified by:  /home/gulang2022/.local/share/accelergy/estimation_plug_ins/accelergy-table-based-plug-ins/table.estimator.yaml 
+table-based-plug-ins Identifies a set of tables named:  test_tables
+Info: estimator plug-in identified by:  /home/gulang2022/.local/share/accelergy/estimation_plug_ins/accelergy-aladdin-plug-in/aladdin.estimator.yaml 
+Info: estimator plug-in identified by:  /home/gulang2022/.local/share/accelergy/estimation_plug_ins/dummy_tables/dummy.estimator.yaml 
+Info: CACTI plug-in... Querying CACTI for request:
+ {'class_name': 'SRAM', 'attributes': {'depth': 32768, 'width': 64, 'block-size': 8, 'word-bits': 8, 'technology': '40nm', 'n_rd_ports': 0, 'n_wr_ports': 0, 'n_rdwr_ports': 1, 'n_banks': 1, 'latency': '5ns'}, 'action_name': 'read', 'arguments': {'data_delta': 0, 'address_delta': 0}}
+copy  /home/gulang2022/.local/share/accelergy/estimation_plug_ins/accelergy-cacti-plug-in/default_SRAM.cfg  to  /home/gulang2022/.local/share/accelergy/estimation_plug_ins/accelergy-cacti-plug-in/cacti/timeloop-model.02_22_13_23_40_SRAM.cfg
+CACTI plug-in removing temp file:  /home/gulang2022/.local/share/accelergy/estimation_plug_ins/accelergy-cacti-plug-in/cacti/timeloop-model.02_22_13_23_40_SRAM.cfg
+Warn: No action counts are specified as yaml input 
+Info: flattened architecture is saved to: ./timeloop-model.flattened_architecture.yaml 
+Info: energy reference table is saved to: ./timeloop-model.ERT.yaml 
+Info: energy reference table summary is saved to: ./timeloop-model.ERT_summary.yaml 
+Warn: no runtime energy estimations are generated... not generating energy_estimation.yaml 
+Info: area reference table is saved to: ./timeloop-model.ART.yaml 
+Info: area reference table summary is saved to: ./timeloop-model.ART_summary.yaml 

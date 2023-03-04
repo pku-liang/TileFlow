@@ -1,0 +1,16 @@
+mapping:
+  - target: MainMemory 
+    type: temporal
+    factors: R=12 M=1 N=1
+    permutation: RMN 
+
+  - target: MainMemory 
+    type: spatial
+    factors: R=1 M=4 N=4 
+    split: 2 # at which dimension the split happens
+    permutation: RMN
+
+  - target: RegFile 
+    type: temporal 
+    factors: R=1 M=1 N=1
+    permutation: RMN

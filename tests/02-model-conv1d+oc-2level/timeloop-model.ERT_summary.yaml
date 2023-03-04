@@ -1,0 +1,46 @@
+ERT_summary:
+  version: 0.3
+  table_summary:
+  - name: System.PE.Buffer
+    actions:
+    - name: read
+      average_energy: 0.25099
+      max_energy: 0.49725
+      min_energy: 0.00473
+    - name: write
+      average_energy: 0.25099
+      max_energy: 0.49725
+      min_energy: 0.00473
+    - name: idle
+      energy: 0.00473
+    primitive_estimation(s):
+    - name: System.PE.Buffer
+      estimator: Aladdin_table
+  - name: System.PE.MACC
+    actions:
+    - name: mac_random
+      energy: 0.5608
+    - name: mac_reused
+      energy: 0.47989
+    - name: mac_gated
+      energy: 0.03642
+    - name: idle
+      energy: 0.01797
+    primitive_estimation(s):
+    - name: System.PE.MACC
+      estimator: Aladdin_table
+  - name: System.MainMemory
+    actions:
+    - name: read
+      average_energy: 19.95123
+      max_energy: 39.8775
+      min_energy: 0.02495
+    - name: write
+      average_energy: 16.21128
+      max_energy: 32.3976
+      min_energy: 0.02495
+    - name: idle
+      energy: 0.02495
+    primitive_estimation(s):
+    - name: System.MainMemory
+      estimator: Cacti

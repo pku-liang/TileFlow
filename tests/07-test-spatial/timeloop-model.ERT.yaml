@@ -1,0 +1,73 @@
+ERT:
+  version: 0.3
+  tables:
+  - name: System.PE.RegFile[0..15]
+    actions:
+    - name: read
+      arguments:
+        address_delta: 0
+        data_delta: 0
+      energy: 1
+    - name: read
+      arguments:
+        address_delta: 0
+        data_delta: 1
+      energy: 1
+    - name: read
+      arguments:
+        address_delta: 1
+        data_delta: 0
+      energy: 1
+    - name: read
+      arguments:
+        address_delta: 1
+        data_delta: 1
+      energy: 1
+    - name: write
+      arguments:
+        address_delta: 0
+        data_delta: 0
+      energy: 1
+    - name: write
+      arguments:
+        address_delta: 0
+        data_delta: 1
+      energy: 1
+    - name: write
+      arguments:
+        address_delta: 1
+        data_delta: 0
+      energy: 1
+    - name: write
+      arguments:
+        address_delta: 1
+        data_delta: 1
+      energy: 1
+    - name: idle
+      arguments: null
+      energy: 0
+  - name: System.PE.mac [0..15]
+    actions:
+    - name: mac_random
+      arguments: null
+      energy: 1
+    - name: mac_reused
+      arguments: null
+      energy: 1
+    - name: mac_gated
+      arguments: null
+      energy: 1
+    - name: idle
+      arguments: null
+      energy: 0
+  - name: System.MainMemory
+    actions:
+    - name: read
+      arguments: null
+      energy: 2048
+    - name: write
+      arguments: null
+      energy: 2048
+    - name: idle
+      arguments: null
+      energy: 0

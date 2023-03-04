@@ -1,0 +1,42 @@
+ERT_summary:
+  version: 0.3
+  table_summary:
+  - name: System.PE.RegFile[0..15]
+    actions:
+    - name: read
+      average_energy: 1.0
+      max_energy: 1
+      min_energy: 1
+    - name: write
+      average_energy: 1.0
+      max_energy: 1
+      min_energy: 1
+    - name: idle
+      energy: 0
+    primitive_estimation(s):
+    - name: System.PE.RegFile[0..15]
+      estimator: dummy_table
+  - name: System.PE.mac [0..15]
+    actions:
+    - name: mac_random
+      energy: 1
+    - name: mac_reused
+      energy: 1
+    - name: mac_gated
+      energy: 1
+    - name: idle
+      energy: 0
+    primitive_estimation(s):
+    - name: System.PE.mac [0..15]
+      estimator: dummy_table
+  - name: System.MainMemory
+    actions:
+    - name: read
+      energy: 2048
+    - name: write
+      energy: 2048
+    - name: idle
+      energy: 0
+    primitive_estimation(s):
+    - name: System.MainMemory
+      estimator: Cacti

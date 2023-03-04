@@ -1,0 +1,423 @@
+input file: arch/spatial-arch.yaml
+input file: prob/systolic-array.yaml
+input file: map/map.yaml
+In LegacyNetwork::ParseSpecs
+Warning: neither block size nor cluster size specified, set according to specified storage width: block size: 2  cluster-size: 1
+In LegacyNetwork::ParseSpecs
+execute:/home/gulang2022/.local/bin/accelergy arch/spatial-arch.yaml prob/systolic-array.yaml map/map.yaml --oprefix timeloop-model. -o ./ > timeloop-model.accelergy.log 2>&1
+user_bypass_strings:        Out: X1
+        MA: X1
+        MB: X1
+
+mapping:Mapping ID = 0
+Loop Nest:
+----------
+for R in [0:12)
+  for N in [0:4) (Spatial-Y)
+    for M in [0:4) (Spatial-X)
+------------------------------------------
+      for R in [0:1)
+
+
+Datatype Bypass Nest:
+---------------------
+       Out: 00000000000000000000000000000011
+        MA: 00000000000000000000000000000011
+        MB: 00000000000000000000000000000011
+
+
+
+ ==================================================== 
+L1[OMM] R12 N4Y M4X - L0[OMM] R1 
+ ====================================================  
+---------spatial properties------------
+0:R1, logical fanout: 1, num_spatial_elems: 16
+1:M4X, logical fanout: 0, num_spatial_elems: 4
+2:N4Y, logical fanout: 16, num_spatial_elems: 1
+3:R12, logical fanout: 1, num_spatial_elems: 1
+-----end spatial properties------------
+descs:
+L0:2, for R in [0:1)
+L1:0, for M in [0:4) (Spatial-X)
+L2:1, for N in [0:4) (Spatial-Y)
+L3:2, for R in [0:12)
+NumFlattenedDimensions:3
+vector_strides:0:[3]: 1 1 1 ,1:[3]: 1 1 1 ,2:[3]: 4 1 1 ,3:[3]: 4 4 1 ,
+mold_low_:[3]: 0 0 0 ,[3]: 0 0 0 ,[3]: 0 0 0 ,[3]: 0 0 0 ,
+mold_high_:[3]: 0 0 0 ,[3]: 3 0 0 ,[3]: 3 3 0 ,[3]: 3 3 11 ,
+mold_high_residual_:[3]: 0 0 0 ,[3]: 3 0 0 ,[3]: 3 3 0 ,[3]: 3 3 11 ,
+cur_scale:M: 4
+N: 4
+R: 12
+
+cur_scale_residualM: 4
+N: 4
+R: 12
+
+storage_boundary_level_:0,3,
+CD level 3 about to access live state with stamp: /
+CD level 3 potentially created live state entry. Full state:
+  /->0
+NestAnalysis::ComputeTemporalWorkingSet::level is 3,num_epochs_ is 1,loop state is R12
+CD level 2 about to access live state with stamp: /
+CD level 2 potentially created live state entry. Full state:
+  /->0
+Iteration run: 0 sdi 0 calling temporal 
+innermost FSD at level 1 spatial_id_ = 0 sdsize = 0 unskewed = 0 skewed = 0
+CD level 0 about to access live state with stamp: /0/
+CD level 0 potentially created live state entry. Full state:
+  /0/->0
+NestAnalysis::ComputeTemporalWorkingSet::level is 0,num_epochs_ is 1,loop state is R1
+constructing OperationSpace, low:[3]: 0 0 0 ,high:[3]: 0 0 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 0 0 0 
+projected to dspace aahr: [2]: 0 0  - [2]: 0 0 
+dataspace: [2]: 0 0  - [2]: 1 1 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 0 0 0 
+projected to dspace aahr: [2]: 0 0  - [2]: 0 0 
+dataspace: [2]: 0 0  - [2]: 1 1 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 0 0 0 
+projected to dspace aahr: [2]: 0 0  - [2]: 0 0 
+dataspace: [2]: 0 0  - [2]: 1 1 )
+    [tracing]:t/0/ s/0/ Out: { [0,0:1,1), } MA: { [0,0:1,1), } MB: { [0,0:1,1), } 
+constructing OperationSpace, low:[3]: 1 0 0 ,high:[3]: 4 0 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 1 0 0  - [3]: 4 0 0 
+projected to dspace aahr: [2]: 1 0  - [2]: 4 0 
+dataspace: [2]: 1 0  - [2]: 5 1 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 1 0 0  - [3]: 4 0 0 
+projected to dspace aahr: [2]: 1 0  - [2]: 4 0 
+dataspace: [2]: 1 0  - [2]: 5 1 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 1 0 0  - [3]: 4 0 0 
+projected to dspace aahr: [2]: 1 0  - [2]: 4 0 
+dataspace: [2]: 1 0  - [2]: 5 1 )
+constructing OperationSpace, low:[3]: 2 0 0 ,high:[3]: 5 0 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 2 0 0  - [3]: 5 0 0 
+projected to dspace aahr: [2]: 2 0  - [2]: 5 0 
+dataspace: [2]: 2 0  - [2]: 6 1 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 2 0 0  - [3]: 5 0 0 
+projected to dspace aahr: [2]: 2 0  - [2]: 5 0 
+dataspace: [2]: 2 0  - [2]: 6 1 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 2 0 0  - [3]: 5 0 0 
+projected to dspace aahr: [2]: 2 0  - [2]: 5 0 
+dataspace: [2]: 2 0  - [2]: 6 1 )
+constructing OperationSpace, low:[3]: 0 1 0 ,high:[3]: 3 4 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 1 0  - [3]: 3 4 0 
+projected to dspace aahr: [2]: 0 1  - [2]: 3 4 
+dataspace: [2]: 0 1  - [2]: 4 5 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 1 0  - [3]: 3 4 0 
+projected to dspace aahr: [2]: 0 1  - [2]: 3 4 
+dataspace: [2]: 0 1  - [2]: 4 5 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 1 0  - [3]: 3 4 0 
+projected to dspace aahr: [2]: 0 1  - [2]: 3 4 
+dataspace: [2]: 0 1  - [2]: 4 5 )
+constructing OperationSpace, low:[3]: 0 2 0 ,high:[3]: 3 5 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 2 0  - [3]: 3 5 0 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 2 0  - [3]: 3 5 0 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 2 0  - [3]: 3 5 0 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+constructing OperationSpace, low:[3]: 0 2 0 ,high:[3]: 3 5 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 2 0  - [3]: 3 5 0 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 2 0  - [3]: 3 5 0 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 2 0  - [3]: 3 5 0 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+constructing OperationSpace, low:[3]: 0 3 0 ,high:[3]: 3 6 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 3 0  - [3]: 3 6 0 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 3 0  - [3]: 3 6 0 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 3 0  - [3]: 3 6 0 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+constructing OperationSpace, low:[3]: 0 3 0 ,high:[3]: 3 6 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 3 0  - [3]: 3 6 0 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 3 0  - [3]: 3 6 0 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 3 0  - [3]: 3 6 0 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+constructing OperationSpace, low:[3]: 0 4 0 ,high:[3]: 3 7 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 4 0  - [3]: 3 7 0 
+projected to dspace aahr: [2]: 0 4  - [2]: 3 7 
+dataspace: [2]: 0 4  - [2]: 4 8 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 4 0  - [3]: 3 7 0 
+projected to dspace aahr: [2]: 0 4  - [2]: 3 7 
+dataspace: [2]: 0 4  - [2]: 4 8 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 4 0  - [3]: 3 7 0 
+projected to dspace aahr: [2]: 0 4  - [2]: 3 7 
+dataspace: [2]: 0 4  - [2]: 4 8 )
+ComputeSpatialWorkingSet for N4Y, at /0/
+-----------Spatial Deltas------------
+15: Out: { [3,3:4,4), } MA: { [3,3:4,4), } MB: { [3,3:4,4), } 
+14: Out: { [2,3:3,4), } MA: { [2,3:3,4), } MB: { [2,3:3,4), } 
+13: Out: { [1,3:2,4), } MA: { [1,3:2,4), } MB: { [1,3:2,4), } 
+0: Out: { [0,0:1,1), } MA: { [0,0:1,1), } MB: { [0,0:1,1), } 
+1: Out: { [1,0:2,1), } MA: { [1,0:2,1), } MB: { [1,0:2,1), } 
+2: Out: { [2,0:3,1), } MA: { [2,0:3,1), } MB: { [2,0:3,1), } 
+3: Out: { [3,0:4,1), } MA: { [3,0:4,1), } MB: { [3,0:4,1), } 
+4: Out: { [0,1:1,2), } MA: { [0,1:1,2), } MB: { [0,1:1,2), } 
+5: Out: { [1,1:2,2), } MA: { [1,1:2,2), } MB: { [1,1:2,2), } 
+6: Out: { [2,1:3,2), } MA: { [2,1:3,2), } MB: { [2,1:3,2), } 
+7: Out: { [3,1:4,2), } MA: { [3,1:4,2), } MB: { [3,1:4,2), } 
+8: Out: { [0,2:1,3), } MA: { [0,2:1,3), } MB: { [0,2:1,3), } 
+9: Out: { [1,2:2,3), } MA: { [1,2:2,3), } MB: { [1,2:2,3), } 
+10: Out: { [2,2:3,3), } MA: { [2,2:3,3), } MB: { [2,2:3,3), } 
+11: Out: { [3,2:4,3), } MA: { [3,2:4,3), } MB: { [3,2:4,3), } 
+12: Out: { [0,3:1,4), } MA: { [0,3:1,4), } MB: { [0,3:1,4), } 
+-------------------------------------
+gEnableLinkTransfers, linked_spatial_level: 1, 1
+use multicast transfer for Out
+use multicast transfer for MA
+use multicast transfer for MB
+constructing OperationSpace, low:[3]: 0 0 0 ,high:[3]: 3 3 0 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 3 3 0 
+projected to dspace aahr: [2]: 0 0  - [2]: 3 3 
+dataspace: [2]: 0 0  - [2]: 4 4 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 3 3 0 
+projected to dspace aahr: [2]: 0 0  - [2]: 3 3 
+dataspace: [2]: 0 0  - [2]: 4 4 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 3 3 0 
+projected to dspace aahr: [2]: 0 0  - [2]: 3 3 
+dataspace: [2]: 0 0  - [2]: 4 4 )
+CD level 2 about to access live state with stamp: /
+CD level 2 potentially created live state entry. Full state:
+  /->16
+Iteration run: 0 sdi 0 calling temporal 
+innermost FSD at level 1 spatial_id_ = 0 sdsize = 0 unskewed = 0 skewed = 0
+CD level 0 about to access live state with stamp: /0/
+CD level 0 potentially created live state entry. Full state:
+  /0/->1
+NestAnalysis::ComputeTemporalWorkingSet::level is 0,num_epochs_ is 11,loop state is R1
+constructing OperationSpace, low:[3]: 0 0 1 ,high:[3]: 0 0 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 0 1  - [3]: 0 0 1 
+projected to dspace aahr: [2]: 0 0  - [2]: 0 0 
+dataspace: [2]: 0 0  - [2]: 1 1 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 0 1  - [3]: 0 0 1 
+projected to dspace aahr: [2]: 0 1  - [2]: 0 1 
+dataspace: [2]: 0 1  - [2]: 1 2 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 0 1  - [3]: 0 0 1 
+projected to dspace aahr: [2]: 1 0  - [2]: 1 0 
+dataspace: [2]: 1 0  - [2]: 2 1 )
+    [tracing]:t/1/ s/0/ Out: { [0,0:1,1), } MA: { [0,1:1,2), } MB: { [1,0:2,1), } 
+constructing OperationSpace, low:[3]: 1 0 1 ,high:[3]: 4 0 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 1 0 1  - [3]: 4 0 1 
+projected to dspace aahr: [2]: 1 0  - [2]: 4 0 
+dataspace: [2]: 1 0  - [2]: 5 1 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 1 0 1  - [3]: 4 0 1 
+projected to dspace aahr: [2]: 1 1  - [2]: 4 1 
+dataspace: [2]: 1 1  - [2]: 5 2 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 1 0 1  - [3]: 4 0 1 
+projected to dspace aahr: [2]: 2 0  - [2]: 5 0 
+dataspace: [2]: 2 0  - [2]: 6 1 )
+constructing OperationSpace, low:[3]: 2 0 1 ,high:[3]: 5 0 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 2 0 1  - [3]: 5 0 1 
+projected to dspace aahr: [2]: 2 0  - [2]: 5 0 
+dataspace: [2]: 2 0  - [2]: 6 1 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 2 0 1  - [3]: 5 0 1 
+projected to dspace aahr: [2]: 2 1  - [2]: 5 1 
+dataspace: [2]: 2 1  - [2]: 6 2 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 2 0 1  - [3]: 5 0 1 
+projected to dspace aahr: [2]: 3 0  - [2]: 6 0 
+dataspace: [2]: 3 0  - [2]: 7 1 )
+constructing OperationSpace, low:[3]: 0 1 1 ,high:[3]: 3 4 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 1 1  - [3]: 3 4 1 
+projected to dspace aahr: [2]: 0 1  - [2]: 3 4 
+dataspace: [2]: 0 1  - [2]: 4 5 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 1 1  - [3]: 3 4 1 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 1 1  - [3]: 3 4 1 
+projected to dspace aahr: [2]: 1 1  - [2]: 4 4 
+dataspace: [2]: 1 1  - [2]: 5 5 )
+constructing OperationSpace, low:[3]: 0 2 1 ,high:[3]: 3 5 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 2 1  - [3]: 3 5 1 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 2 1  - [3]: 3 5 1 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 2 1  - [3]: 3 5 1 
+projected to dspace aahr: [2]: 1 2  - [2]: 4 5 
+dataspace: [2]: 1 2  - [2]: 5 6 )
+constructing OperationSpace, low:[3]: 0 2 1 ,high:[3]: 3 5 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 2 1  - [3]: 3 5 1 
+projected to dspace aahr: [2]: 0 2  - [2]: 3 5 
+dataspace: [2]: 0 2  - [2]: 4 6 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 2 1  - [3]: 3 5 1 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 2 1  - [3]: 3 5 1 
+projected to dspace aahr: [2]: 1 2  - [2]: 4 5 
+dataspace: [2]: 1 2  - [2]: 5 6 )
+constructing OperationSpace, low:[3]: 0 3 1 ,high:[3]: 3 6 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 3 1  - [3]: 3 6 1 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 3 1  - [3]: 3 6 1 
+projected to dspace aahr: [2]: 0 4  - [2]: 3 7 
+dataspace: [2]: 0 4  - [2]: 4 8 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 3 1  - [3]: 3 6 1 
+projected to dspace aahr: [2]: 1 3  - [2]: 4 6 
+dataspace: [2]: 1 3  - [2]: 5 7 )
+constructing OperationSpace, low:[3]: 0 3 1 ,high:[3]: 3 6 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 3 1  - [3]: 3 6 1 
+projected to dspace aahr: [2]: 0 3  - [2]: 3 6 
+dataspace: [2]: 0 3  - [2]: 4 7 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 3 1  - [3]: 3 6 1 
+projected to dspace aahr: [2]: 0 4  - [2]: 3 7 
+dataspace: [2]: 0 4  - [2]: 4 8 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 3 1  - [3]: 3 6 1 
+projected to dspace aahr: [2]: 1 3  - [2]: 4 6 
+dataspace: [2]: 1 3  - [2]: 5 7 )
+constructing OperationSpace, low:[3]: 0 4 1 ,high:[3]: 3 7 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 4 1  - [3]: 3 7 1 
+projected to dspace aahr: [2]: 0 4  - [2]: 3 7 
+dataspace: [2]: 0 4  - [2]: 4 8 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 4 1  - [3]: 3 7 1 
+projected to dspace aahr: [2]: 0 5  - [2]: 3 8 
+dataspace: [2]: 0 5  - [2]: 4 9 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 4 1  - [3]: 3 7 1 
+projected to dspace aahr: [2]: 1 4  - [2]: 4 7 
+dataspace: [2]: 1 4  - [2]: 5 8 )
+ComputeSpatialWorkingSet for N4Y, at /1/
+-----------Spatial Deltas------------
+15: Out: { } MA: { [3,4:4,5), } MB: { [4,3:5,4), } 
+14: Out: { } MA: { [2,4:3,5), } MB: { [3,3:4,4), } 
+13: Out: { } MA: { [1,4:2,5), } MB: { [2,3:3,4), } 
+0: Out: { } MA: { [0,1:1,2), } MB: { [1,0:2,1), } 
+1: Out: { } MA: { [1,1:2,2), } MB: { [2,0:3,1), } 
+2: Out: { } MA: { [2,1:3,2), } MB: { [3,0:4,1), } 
+3: Out: { } MA: { [3,1:4,2), } MB: { [4,0:5,1), } 
+4: Out: { } MA: { [0,2:1,3), } MB: { [1,1:2,2), } 
+5: Out: { } MA: { [1,2:2,3), } MB: { [2,1:3,2), } 
+6: Out: { } MA: { [2,2:3,3), } MB: { [3,1:4,2), } 
+7: Out: { } MA: { [3,2:4,3), } MB: { [4,1:5,2), } 
+8: Out: { } MA: { [0,3:1,4), } MB: { [1,2:2,3), } 
+9: Out: { } MA: { [1,3:2,4), } MB: { [2,2:3,3), } 
+10: Out: { } MA: { [2,3:3,4), } MB: { [3,2:4,3), } 
+11: Out: { } MA: { [3,3:4,4), } MB: { [4,2:5,3), } 
+12: Out: { } MA: { [0,4:1,5), } MB: { [1,3:2,4), } 
+-------------------------------------
+gEnableLinkTransfers, linked_spatial_level: 1, 1
+use multicast transfer for Out
+use link transfer for MA
+use link transfer for MB
+constructing OperationSpace, low:[3]: 0 0 1 ,high:[3]: 3 3 1 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 0 1  - [3]: 3 3 1 
+projected to dspace aahr: [2]: 0 0  - [2]: 3 3 
+dataspace: [2]: 0 0  - [2]: 4 4 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 0 1  - [3]: 3 3 1 
+projected to dspace aahr: [2]: 0 1  - [2]: 3 4 
+dataspace: [2]: 0 1  - [2]: 4 5 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 0 1  - [3]: 3 3 1 
+projected to dspace aahr: [2]: 1 0  - [2]: 4 3 
+dataspace: [2]: 1 0  - [2]: 5 4 )
+constructing OperationSpace, low:[3]: 0 0 0 ,high:[3]: 3 3 11 
+wc->GetShape()->UsesFlattening:0
+dataspace:Out,0, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 3 3 11 
+projected to dspace aahr: [2]: 0 0  - [2]: 3 3 
+dataspace: [2]: 0 0  - [2]: 4 4 )
+dataspace:MA,1, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 3 3 11 
+projected to dspace aahr: [2]: 0 0  - [2]: 3 14 
+dataspace: [2]: 0 0  - [2]: 4 15 )
+dataspace:MB,2, 2
+projecting ispace aahr  : [3]: 0 0 0  - [3]: 3 3 11 
+projected to dspace aahr: [2]: 0 0  - [2]: 14 3 
+dataspace: [2]: 0 0  - [2]: 15 4 )
+  [tracing]:t/ s/ Out: { [0,0:4,4), } MA: { [0,0:4,15), } MB: { [0,0:15,4), } 
+Utilization = 0.46 | pJ/Compute =   58.083

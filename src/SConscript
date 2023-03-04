@@ -1,0 +1,100 @@
+import os 
+
+Import('env')
+
+env.Append(CPPDEFINES = [('BUILD_BASE_DIR', '\\"' + env["BUILD_BASE_DIR"] + '\\"')])
+env.Append(CPPPATH = [os.path.join(env['BUILD_BASE_DIR'], 'include')])
+env.Append(CPPPATH = [os.path.join(env['TIMELOOP_BASE_DIR'], 'include')])
+#env.Append(CPPPATH = ['src/include'])
+#env["CPPPATH"] = ["."]
+
+if GetOption('debug'):
+    env.Append(CCFLAGS = ['-g', '-O0'])
+else:
+    env.Append(CCFLAGS = ['-g', '-O3', '-flto'])
+    
+env.Append(CCFLAGS = ['-Werror', '-Wall', '-Wextra', '-std=c++17', '-pthread'])
+
+if GetOption('clang'):
+  env.Append(CCFLAGS = ['-ferror-limit=1'])
+else:
+  env.Append(CCFLAGS = ['-fmax-errors=1'])
+
+env.Append(LIBPATH = ['.', os.path.join(env['BUILD_BASE_DIR'], 'lib')])
+# If we are doing a static build, the timeloop library must be the first
+# item in the link order.
+if GetOption('link_static'):
+    env.Append(LIBS = ['timeloop-mapper'])
+
+env.Append(LINKFLAGS = ['-std=c++17', '-pthread'])
+if str(Platform()) != 'darwin':
+  env.Append(LINKFLAGS = ['-static-libgcc', '-static-libstdc++'])
+
+env.Append(LIBS = ['config++', 'yaml-cpp', 'ncurses'])
+if str(Platform()) != 'darwin':
+  env.Append(LIBS = ['tinfo'])
+
+# barvinok needs to be before isl because it references isl functions
+if GetOption('link_static'):
+    print("Using static linking.")
+    env.Append(LINKFLAGS = [ '-Wl,--whole-archive', '-static', '-lpthread', '-Wl,--no-whole-archive'])
+    env.Append(LIBS = ['tinfo', 'gpm'])
+else:
+    print("Using dynamic linking.")
+
+env.Append(LIBS = ['boost_iostreams', 'boost_serialization'])
+
+if os.environ.get('BOOSTDIR'):
+    env.Append(CPPFLAGS = ['-I' + os.environ['BOOSTDIR'] + '/include'])
+    env.Append(LIBPATH = [os.environ['BOOSTDIR'] + '/lib'])
+
+if "LIBCONFIGPATH" in os.environ:
+    LIBCONFIGPATH = os.environ["LIBCONFIGPATH"]
+    env["LIBPATH"] += [LIBCONFIGPATH + '/lib']
+    env["CPPFLAGS"] += ['-I' + LIBCONFIGPATH + '/include']
+
+if "HDF5PATH" in os.environ:
+    HDF5PATH = os.environ["HDF5PATH"]
+    env["LIBPATH"] += [HDF5PATH + '/lib']
+    env["CPPFLAGS"] += ['-I' + HDF5PATH + '/include']
+    env["LIBS"] += ['hdf5', 'hdf5_hl']
+elif "HDF5PATH_INCLUDE" in os.environ:
+    HDF5PATH_INCLUDE = os.environ["HDF5PATH_INCLUDE"]
+    env["CPPPATH"] += ['-I' + HDF5PATH_INCLUDE]
+    env["LIBS"] += ['hdf5_cpp', 'hdf5_hl_cpp', 'hdf5_serial', 'hdf5_serial_hl']
+
+if "YAMLCPPPATH" in os.environ:
+    YAMLCPPPATH = os.environ["YAMLCPPPATH"]
+    env["LIBPATH"] += [YAMLCPPPATH + '/lib']
+    env["CPPFLAGS"] += ['-I' + YAMLCPPPATH + '/include']
+
+if "NCURSESPATH" in os.environ:
+    NCURSESPATH = os.environ["NCURSESPATH"]
+    env.Append(LIBPATH = [NCURSESPATH + '/lib'])
+    env.Append(CPPFLAGS = ['-I' + NCURSESPATH + '/include'])
+
+if "BARVINOKPATH" in os.environ:
+    BARVINOKPATH = os.environ["BARVINOKPATH"]
+    env.Append(LIBPATH = [BARVINOKPATH + '/lib'])
+    env.Append(CPPFLAGS = ['-I' + BARVINOKPATH + '/include'])
+
+if "NTLPATH" in os.environ:
+    NTLPATH = os.environ["NTLPATH"]
+    env.Append(LIBPATH = [NTLPATH + '/lib'])
+    env.Append(CPPFLAGS = ['-I' + NTLPATH + '/include'])
+
+if GetOption('use_accelergy'):
+    env["CPPDEFINES"] += [('USE_ACCELERGY')]
+
+# if not os.path.isdir('../src/pat'):
+#     print ("ERROR: 'src/pat' not found. Please create a symbolic link to the source code for the power-area-timing model and place it in src/pat. E.g., ln -s pat-public/src/pat src/pat.")
+#     Exit(1)
+
+model_sources = Split("""
+application/main.cpp
+application/model.cpp
+""")
+
+bin_model = env.Program(target = 'timeloopX', source = model_sources) 
+
+env.Install(env['BUILD_BASE_DIR'] + "/bin", [bin_model])
