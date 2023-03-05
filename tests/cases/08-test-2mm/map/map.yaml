@@ -1,0 +1,85 @@
+mapping:
+  node-type: Scope 
+  type: Sequential 
+  target: MainMemory 
+
+  subtree: 
+  - node-type: Tile 
+    type: temporal 
+    factors: M=1 L=1 
+    permutation: ML 
+    
+    subtree: 
+    - node-type: Scope 
+      type: Paralell 
+      target: MainMemory 
+      
+      subtree: 
+        - node-type: Scope 
+          type: Sequential 
+          target: MainMemory 
+
+          subtree: 
+          - node-type: Tile 
+            type: Spatial 
+            factors: M=1 L=1
+            permutation: ML 
+            split: 1
+            
+            subtree: 
+            - node-type: Scope 
+              type: Sequential 
+              target: RegFile 
+
+              subtree:
+              - node-type: Tile 
+                type: temporal 
+                factors: M=1  L=1 
+                permutation: ML 
+                
+                subtree: 
+                - node-type: Op
+                  name: EXP  
+                  binding: M:M, L:L 
+          - node-type: Tile
+            type: Spatial 
+            factors: M=1 L=1 
+            permutation: ML 
+            split: 1
+            
+            subtree:
+            - node-type: Scope 
+              type: Sequential 
+              target: RegFile 
+
+              subtree:
+              - node-type: Tile 
+                type: temporal 
+                factors: M=1  L=1 N=1 
+                permutation: MLN 
+                
+                subtree: 
+                - node-type: Op
+                  name: GEMM2  
+                  binding: M:M, L:L, N:N 
+        - node-type: Tile 
+          type: Spatial 
+          factors: M=1 L=1 
+          split: 1
+          permutation: ML 
+          
+          subtree:
+          - node-type: Scope 
+            type: Sequential 
+            target: RegFile
+
+            subtree: 
+            - node-type: Tile 
+              type: temporal  
+              factors: M=1 L=1 K=1
+              permutation: MLK 
+              
+              subtree:
+              - node-type: Op
+                name: GEMM1 
+                binding: M:M L:L K:K 

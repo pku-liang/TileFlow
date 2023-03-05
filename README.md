@@ -11,16 +11,30 @@ sudo apt install scons libconfig++-dev libboost-dev libboost-iostreams-dev libbo
 
 2. install timeloop
 ```bash 
-git clone https://github.com/gulang2019/timeloop.git
-cd timeloop/src
+git clone --recursive git@github.com:gulang2019/TimeloopX.git
+cd TimeloopX
+export TIMELOOPX_BASE=$(pwd)
+
+# build timeloop
+cd 3rdparty/timeloop/src
 ln -s ../pat-public/src/pat .
 cd ..
 scons --accelergy -j4 --static [--d] # --d for debug build
-source ./env/setup-env.bash
+
+cd $(TIMELOOPX_BASE)
+# build frontend parser 
+scons --accelergy -j4 --static --parser [--d]
+# build timeloopx: error now 
+scons --accelergy -j4 --static [--d] 
+
+# add bin to path 
+source ./env/setup-env.sh 
 ```
 
 3. check installation 
+
 ```bash 
-cd ./tests/07-test-spatial
-timeloop-model arch/spatial-arch.yaml prob/systolic-array.yaml map/map.yaml 
+# test parser 
+cd ./tests/cases/08-test-2mm # a sample input for 2mm.
+parser arch/* prob/* map/* 
 ```

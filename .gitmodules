@@ -1,0 +1,3 @@
+[submodule "3rdparty/timeloop"]
+	path = 3rdparty/timeloop
+	url = git@github.com:gulang2019/timeloop.git

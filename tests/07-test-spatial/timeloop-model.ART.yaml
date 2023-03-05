@@ -1,9 +1,0 @@
-ART:
-  version: 0.3
-  tables:
-  - name: System.PE.RegFile[0..15]
-    area: 1
-  - name: System.PE.mac [0..15]
-    area: 1
-  - name: System.MainMemory
-    area: 0

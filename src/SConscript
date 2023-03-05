@@ -90,6 +90,19 @@ if GetOption('use_accelergy'):
 #     print ("ERROR: 'src/pat' not found. Please create a symbolic link to the source code for the power-area-timing model and place it in src/pat. E.g., ln -s pat-public/src/pat src/pat.")
 #     Exit(1)
 
+lib_sources = Split("""
+problem/parser.cpp
+mapping/parser.cpp
+""")
+
+libenv = env.Clone()
+if GetOption("link_static"):
+    lib_timeloopX = libenv.StaticLibrary(target="timeloopX", source = lib_sources)
+    libenv.Install(env["BUILD_BASE_DIR"] + "/lib", [lib_timeloopX]) 
+else:
+    lib_timeloopX_shared = libenv.SharedLibrary(target = "timeloopX", source = lib_sources)
+    libenv.Install(env['BUILD_BASE_DIR'] + '/lib', [ lib_timeloopX_shared]) 
+
 model_sources = Split("""
 application/main.cpp
 application/model.cpp
