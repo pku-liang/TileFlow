@@ -33,7 +33,7 @@ class Application
 
  protected:
   // Critical state.
-  problem::Workload workload_;
+  std::vector<problem::Workload> workloads_;
   model::Engine::Specs arch_specs_;
 
   // Many of the following submodules are dynamic objects because

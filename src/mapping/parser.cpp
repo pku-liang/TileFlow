@@ -25,9 +25,10 @@ ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope){
     else if (type_s.find("para") != std::string::npos) {
         type = Parallel;
     }
+    else if (type_s.find("pipe") != std::string::npos) {
+        type = Pipeline;
+    }
     else {TIMELOOPX_ERROR("ScopeNode type error. Should has type sequential/parallel");}
-    
-    storage_level_ = ParseStorageLevel(config);
 
 }   
 
@@ -64,6 +65,8 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
     }
     
     TIMELOOPX_ASSERT(iters.size() == loop_bounds.size(), "permutation & factor iter mismatch");
+
+    storage_level_ = ParseStorageLevel(config);
 
     unsigned split = iters.size();
     config.lookupValue("split", split);
@@ -234,6 +237,7 @@ void TileNode::display(std::string prefix){
     for (auto& loop: loopnests) {
         std::cout << prefix;
         loop.Print(std::cout, true);
+        std::cout << ", " << arch_props_.Specs().topology.GetStorageLevel(storage_level_)->level_name;
         std::cout << std::endl;
         prefix += "  ";
     }
@@ -245,8 +249,7 @@ void ScopeNode::display(std::string prefix) {
     std::cout << prefix << "Scope: ";
     if (type == Sequential) std::cout << "Sequential";
     else if (type == Parallel) std::cout << "Parallel";
-    std::cout << ", storage_level: ";
-    std::cout << arch_props_.Specs().topology.GetStorageLevel(storage_level_)->level_name;
+    else if (type == Pipeline) std::cout << "Pipeline";
     std::cout << "{" << std::endl;
     for (auto child: children) 
         child->display(prefix + "  ");

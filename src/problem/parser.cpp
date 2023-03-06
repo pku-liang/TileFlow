@@ -29,7 +29,6 @@ std::string ParseWorkload(config::CompoundConfigNode config, problem::Workload& 
 }
 
 void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads) {
-  std::cerr << config.isList() << "," << config.isArray() << std::endl;
   if (config.isList()) {
     for (int i = 0; i < config.getLength(); ++i) {
       std::shared_ptr<problem::Workload> p_workload(new Workload());

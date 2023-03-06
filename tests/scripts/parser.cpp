@@ -62,5 +62,7 @@ int main(int argc, char* argv[])
   
   mapping.Print();
 
+  std::cout << "Parser check passed!" << std::endl;
+
   return 0;
 }
