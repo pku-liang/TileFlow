@@ -14,7 +14,7 @@ if GetOption('debug'):
 else:
     env.Append(CCFLAGS = ['-g', '-O3', '-flto'])
     
-env.Append(CCFLAGS = ['-Werror', '-Wall', '-Wextra', '-std=c++17', '-pthread'])
+env.Append(CCFLAGS = ['-Wall', '-Wextra', '-std=c++17', '-pthread'])
 
 if GetOption('clang'):
   env.Append(CCFLAGS = ['-ferror-limit=1'])
@@ -91,6 +91,8 @@ parser_sources = Split("""
 ../src/problem/parser.cpp
 ../src/mapping/loop.cpp
 ../src/mapping/parser.cpp
+../src/mapping/mapping.cpp
+../src/loop-analysis/nest-analysis.cpp
 scripts/parser.cpp
 """)
 

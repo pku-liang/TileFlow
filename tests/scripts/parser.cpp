@@ -8,6 +8,7 @@
 
 #include "timeloopX/problem/problem.hpp"
 #include "timeloopX/mapping/mapping.hpp"
+#include "timeloopX/loop-analysis/nest-analysis.hpp"
 
 extern bool gTerminateEval;
 
@@ -57,10 +58,16 @@ int main(int argc, char* argv[])
   std::cout << std::endl;
 
   problem::TimeloopX::ParseWorkloads(problem, workloads);
+
+  workloads.Print();
   
   auto mapping = mapping::TimeloopX::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
   
   mapping.Print();
+
+  analysis::TimeloopX::NestAnalysis analysis(workloads, mapping);
+  analysis.get_alive_tensors();
+  analysis.Print();
 
   std::cout << "Parser check passed!" << std::endl;
 

@@ -10,6 +10,29 @@ mapping:
     type: Pipeline 
     
     subtree: 
+      - node-type: Tile 
+        type: Spatial 
+        factors: M=1 L=1 
+        split: 1
+        permutation: ML 
+        target: MainMemory
+        
+        subtree:
+        - node-type: Scope 
+          type: Sequential 
+
+          subtree: 
+          - node-type: Tile 
+            type: temporal  
+            factors: M=1 L=1 K=1
+            permutation: MLK 
+            target: RegFile
+            
+            subtree:
+            - node-type: Op
+              name: GEMM1 
+              binding: M:M L:L K:K 
+
       - node-type: Scope 
         type: Sequential 
 
@@ -50,26 +73,4 @@ mapping:
             - node-type: Op
               name: GEMM2  
               binding: M:M, L:L, N:N 
-      - node-type: Tile 
-        type: Spatial 
-        factors: M=1 L=1 
-        split: 1
-        permutation: ML 
-        target: MainMemory
-        
-        subtree:
-        - node-type: Scope 
-          type: Sequential 
-
-          subtree: 
-          - node-type: Tile 
-            type: temporal  
-            factors: M=1 L=1 K=1
-            permutation: MLK 
-            target: RegFile
-            
-            subtree:
-            - node-type: Op
-              name: GEMM1 
-              binding: M:M L:L K:K 
-              depends: []
+      

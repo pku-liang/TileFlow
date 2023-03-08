@@ -219,11 +219,11 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
         config = config.lookup("subtree");
         if (config.isList()){
             for (int i = 0; i < config.getLength(); i++){
-                node->children.push_back(RecursiveParse(config[i]));
+                node->add_child(RecursiveParse(config[i]));
             }
         }
         else {
-            node->children.resize(1, RecursiveParse(config));
+            node->add_child(RecursiveParse(config));
         }
     }
     else if (node_type != "op") {
@@ -233,7 +233,7 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
     return node;
 }
 
-void TileNode::display(std::string prefix){
+void TileNode::display(std::string prefix, bool recursive) const{
     for (auto& loop: loopnests) {
         std::cout << prefix;
         loop.Print(std::cout, true);
@@ -241,23 +241,28 @@ void TileNode::display(std::string prefix){
         std::cout << std::endl;
         prefix += "  ";
     }
-    for (auto child: children)
-        child->display(prefix);
+    if (recursive)
+        for (auto child: children_)
+            child->display(prefix);
 }
 
-void ScopeNode::display(std::string prefix) {
+void ScopeNode::display(std::string prefix, bool recursive) const{
     std::cout << prefix << "Scope: ";
     if (type == Sequential) std::cout << "Sequential";
     else if (type == Parallel) std::cout << "Parallel";
     else if (type == Pipeline) std::cout << "Pipeline";
-    std::cout << "{" << std::endl;
-    for (auto child: children) 
-        child->display(prefix + "  ");
-    std::cout << prefix << "}" << std::endl;
+    if (recursive) {
+        std::cout << "{" << std::endl;
+        for (auto child: children_) 
+            child->display(prefix + "  ");
+        std::cout << prefix << "}" << std::endl;
+    }
 }
 
-void OpNode::display(std::string prefix) {
-    std::cout << prefix << "op:" << name_ << ", binding: "; 
+void OpNode::display(std::string prefix, bool recursive) const {
+    std::cout << prefix;
+    p_workload->Print();
+    std::cout << prefix << ", binding: "; 
     for (auto& bind: binding_) {
         std::cout << bind.first << ":" << p_workload->GetShape()->FlattenedDimensionIDToName.at(bind.second);
         std::cout << ",";

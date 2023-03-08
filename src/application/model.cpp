@@ -30,7 +30,7 @@
 #include "util/accelergy_interface.hpp"
 #include "util/banner.hpp"
 
-#include "applications/model/model.hpp"
+#include "application/model.hpp"
 
 //--------------------------------------------//
 //                Application                 //
@@ -75,7 +75,8 @@ Application::Application(config::CompoundConfig* config,
 
   // Problem configuration.
   auto problem = rootNode.lookup("problem");
-  problem::ParseWorkload(problem, workload_);
+  problem::TimeloopX::ParseWorkloads(problem, workloads_);
+
   if (verbose_)
     std::cout << "Problem configuration complete." << std::endl;
 

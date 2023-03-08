@@ -1,56 +1,66 @@
 problem:
-  - op:  
-      name: GEMM1
-      dimensions: [M,L,K] 
-      data-spaces:
-      - name: C 
-        projection:
-          - [[M]] 
-          - [[L]] 
-        read-write: True 
-      - name: A 
-        projection:
-          - [[M]]
-          - [[K]]
-      - name: B
-        projection:
-          - [[K]]
-          - [[L]]
+  io:
+    ins: A, B, D
+    outs: C, E
+
+  ops:
+  - name: GEMM1
+    dimensions: [M,L,K] 
+    data-spaces:
+    - name: C 
+      projection:
+        - [[M]] 
+        - [[L]] 
+      read-write: True 
+    - name: A 
+      projection:
+        - [[M]]
+        - [[K]]
+    - name: B
+      projection:
+        - [[K]]
+        - [[L]]
+    ins: A, B
+    out: C
     instance: 
       M: 128
       L: 128
       K: 128
    
-  - op: 
-      name: EXP 
-      dimensions: [M,L]
-      type: exp 
-      data-spaces:
-      - name: Out 
-        projection: 
-          - [[M]]
-          - [[L]]
+  - name: EXP 
+    dimensions: [M,L]
+    type: exp 
+    data-spaces:
+    - name: exp 
+      projection: 
+        - [[M]]
+        - [[L]]
+    ins: C
+    out: exp
+    inplace: True
     instance: 
       M: 128
       L: 128
     
-  - op: 
-      name: GEMM2 
-      dimensions: [M,L,N]
-      data-spaces:
-      - name: E 
-        projection: 
-          - [[M]]
-          - [[N]]
-        read-write: True 
-      - name: C
-        projection: 
-          - [[M]]
-          - [[L]]
-      - name: D 
-        projection: 
-          - [[L]]
-          - [[N]]
+  - name: GEMM2 
+    dimensions: [M,L,N]
+    data-spaces:
+    - name: E 
+      projection: 
+        - [[M]]
+        - [[N]]
+      read-write: True 
+    - name: exp
+      projection: 
+        - [[M]]
+        - [[L]]
+    - name: D 
+      projection: 
+        - [[L]]
+        - [[N]]
+    ins: exp, D
+    out: E 
+
     instance: 
       M: 128
       N: 128
