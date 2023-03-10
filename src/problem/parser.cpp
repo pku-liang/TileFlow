@@ -35,8 +35,6 @@ std::string ParseWorkload(config::CompoundConfigNode config, problem::TimeloopX:
 
   workload.set_io(Split(ins), Split(out));
 
-  workload.ParseShape(config);
-
   if (config.exists("instance")) {
     auto factorized_bound = config.lookup("instance");
     problem::ParseWorkloadInstance(factorized_bound, workload);  
@@ -64,55 +62,31 @@ void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads) {
   if (config.exists("ops")) {
     auto ops = config.lookup("ops");
     for (int i = 0; i < ops.getLength(); ++i){
-      std::shared_ptr<Workload> p_workload(new Workload());
+      std::shared_ptr<Workload> p_workload(new Workload(workloads));
       std::string name = problem::TimeloopX::ParseWorkload(ops[i], *p_workload);
       assert(workloads.add_workload(name, p_workload));
     }
   }
   else {
-    std::shared_ptr<Workload> p_workload(new Workload());
+    std::shared_ptr<Workload> p_workload(new Workload(workloads));
     std::string name = problem::TimeloopX::ParseWorkload(config, *p_workload);
     assert(workloads.add_workload(name, p_workload));
   }
 }
 
 bool Workloads::add_workload(const std::string & name, std::shared_ptr<Workload>& workload) {
-  if (opname2id_.count(name)) {
+  if (workloads_.count(name)) {
     TIMELOOPX_WARNING("Duplicate op named " << name << ". Drop all but the first.");
     return false;
   }
-  opname2id_[name] = workloads_.size();
-  
 
-  for (auto& t: workload->ins_)
-    if (!tensor2id_.count(t)) {
-      tensor2id_[t] = tensor2id_.size();
-      id2tensor_.push_back(t);
-    }
-  if (!tensor2id_.count(workload->out_)){
-    tensor2id_[workload->out_] = tensor2id_.size();
-    id2tensor_.push_back(workload->out_);
-  }
-
-  workloads_.push_back(std::move(workload));
+  workloads_[name] = std::move(workload);
   return true;
 }
 
 void Workloads::set_io(const std::vector<std::string>& ins, const std::vector<std::string>& outs) {
   ins_ = ins;
   outs_ = outs;
-  for (auto& in: ins) {
-    if (tensor2id_.count(in) == 0) {
-      tensor2id_[in] = tensor2id_.size();
-      id2tensor_.push_back(in);
-    }
-  }
-  for (auto& out: outs) {
-    if (tensor2id_.count(out) == 0) {
-      tensor2id_[out] = tensor2id_.size();
-      id2tensor_.push_back(out);
-    }
-  }
 }
 
 void Workload::set_io(const std::vector<std::string>& ins, const std::vector<std::string>& outs) {
@@ -133,8 +107,26 @@ void Workloads::Print() {
     std::cout << t << ",";
   }
   std::cout << std::endl;
+  std::cout << "Tensors:" << std::endl;
+  for (int i = 0; i < common_shape_.NumDataSpaces; ++i) {
+    std::cout << "  " << common_shape_.DataSpaceIDToName[i];
+    auto& proj = common_shape_.Projections[i];
+    for (auto& expr: proj) {
+      std::cout << "[";
+      int tmp = 0;
+      for (auto& term: expr) {
+        if (term.first != -1)
+          std::cout << common_shape_.CoefficientIDToName[term.first] << "*";
+        std::cout << common_shape_.FactorizedDimensionIDToName[term.second];
+        if (++tmp != expr.size())
+          std::cout << "+";
+      }
+      std::cout << "]";
+    }
+    std::cout << std::endl;
+  }
   for (auto& ptr: workloads_) {
-    ptr->Print();
+    ptr.second->Print();
   }
   std::cout << "------------End Workloads----------" << std::endl;
 }
@@ -144,6 +136,55 @@ void Workload::Print() {
   std::cout << "(";
   for (auto t: ins_) std::cout << t << ",";
   std::cout << ")->" << out_ << std::endl;
+}
+
+void Workload::apply_binding(const std::unordered_map<std::string, std::string>& binding) {
+  if (binding_applied) 
+    return;
+  auto& common_shape_ = workloads_.common_shape_;
+  
+  for (auto& kv: shape_.FactorizedDimensionNameToID){
+    TIMELOOPX_ASSERT(binding.count(kv.first), kv.first << " of op " << name_ << " is not bond to any runtime iteration.");
+    std::string iter = binding.at(kv.first);
+    if (!common_shape_.FactorizedDimensionNameToID.count(iter)){
+      common_shape_.FactorizedDimensionIDToName[common_shape_.NumFactorizedDimensions] = iter;
+      common_shape_.FactorizedDimensionNameToID[iter] = common_shape_.NumFactorizedDimensions++;
+    }
+  }
+
+  for (auto& kv: shape_.CoefficientNameToID) {
+    std::string coeff_name = name_ + "::" + kv.first;
+    common_shape_.CoefficientIDToName[common_shape_.NumCoefficients] = coeff_name;
+    common_shape_.CoefficientNameToID[coeff_name] = common_shape_.NumCoefficients++;
+  }
+  
+  for (auto& kv: shape_.DataSpaceIDToName) {
+    std::string access_pattern_name = name_ + "::" + kv.second;
+    auto & id = common_shape_.NumDataSpaces;
+    common_shape_.DataSpaceOrder[id] = shape_.DataSpaceOrder[kv.first];
+    common_shape_.IsReadWriteDataSpace[id] = shape_.IsReadWriteDataSpace[kv.first];
+    common_shape_.DataSpaceIDToName[id] = access_pattern_name;
+    common_shape_.DataSpaceNameToID[access_pattern_name] = id++;
+  }
+
+  for (auto& proj: shape_.Projections) {
+    common_shape_.Projections.emplace_back();
+    auto & new_proj = common_shape_.Projections.back();
+    for (auto& expr: proj) {
+      new_proj.emplace_back();
+      auto & new_expr = new_proj.back();
+      for (auto& term: expr) {
+        Shape::CoefficientID new_coeff_id = term.first == shape_.NumCoefficients? -1:
+        common_shape_.CoefficientNameToID[name_+"::"+shape_.CoefficientIDToName[term.first]];
+        Shape::FactorizedDimensionID new_factorized_dim = common_shape_.FactorizedDimensionNameToID[binding.at(shape_.FactorizedDimensionIDToName[term.second])];
+        new_expr.emplace_back(new_coeff_id, new_factorized_dim);
+      }
+    }
+  }
+
+  // provide a walk around; 
+  common_shape_.DefaultCoefficients[-1] = 1;
+  binding_applied = true;
 }
 
 } // namespace TimeloopX 

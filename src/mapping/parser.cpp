@@ -71,8 +71,8 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
     unsigned split = iters.size();
     config.lookupValue("split", split);
     for (unsigned i = 0; i < iters.size(); ++i) {
-        loopnests.emplace_back();
-        loop::TimeloopX::Descriptor& loop = loopnests.back();
+        loopnests_.emplace_back();
+        loop::TimeloopX::Descriptor& loop = loopnests_.back();
         loop.name_ = iters[i];
         loop.start = 0;
         loop.end = loop_bounds[iters[i]].first;
@@ -166,9 +166,7 @@ unsigned Node::ParseStorageLevel(config::CompoundConfigNode directive)
 
 OpNode::OpNode(config::CompoundConfigNode config): Node(Node::Op) {
     assert(config.lookupValue("name", name_));
-    op_index_ = p_workloads_->get_index(name_); 
-    assert(op_index_ >= 0);
-    p_workload = p_workloads_->get_workload(op_index_);
+    p_workload = p_workloads_->get_workload(name_);
 
     std::string str;
     assert(config.lookupValue("binding", str));
@@ -181,13 +179,11 @@ OpNode::OpNode(config::CompoundConfigNode config): Node(Node::Op) {
 
         std::string dim_name = sm[2];
 
-        int dim = p_workload->GetShape()->FlattenedDimensionNameToID.at(dim_name);
-
-        binding_[iter_name] = dim;
+        binding_[dim_name] = iter_name;
 
         str = sm.suffix().str();
     }
-    
+    p_workload->apply_binding(binding_);
 }
 
 
@@ -234,7 +230,7 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
 }
 
 void TileNode::display(std::string prefix, bool recursive) const{
-    for (auto& loop: loopnests) {
+    for (auto& loop: loopnests_) {
         std::cout << prefix;
         loop.Print(std::cout, true);
         std::cout << ", " << arch_props_.Specs().topology.GetStorageLevel(storage_level_)->level_name;
@@ -264,7 +260,7 @@ void OpNode::display(std::string prefix, bool recursive) const {
     p_workload->Print();
     std::cout << prefix << ", binding: "; 
     for (auto& bind: binding_) {
-        std::cout << bind.first << ":" << p_workload->GetShape()->FlattenedDimensionIDToName.at(bind.second);
+        std::cout << bind.first << ":" << bind.second;
         std::cout << ",";
     } 
     std::cout << std::endl;
@@ -280,6 +276,8 @@ Mapping ParseAndConstruct(config::CompoundConfigNode config,
     
     Mapping mapping;
     mapping.root = RecursiveParse(config);
+    mapping.fanoutX_map = arch_props_.FanoutX();
+    mapping.fanoutY_map = arch_props_.FanoutY();
 
     return mapping;
 }

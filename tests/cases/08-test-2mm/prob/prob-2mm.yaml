@@ -1,7 +1,7 @@
 problem:
   io:
     ins: A, B, D
-    outs: C, E
+    outs: E
 
   ops:
   - name: GEMM1
@@ -31,6 +31,10 @@ problem:
     dimensions: [M,L]
     type: exp 
     data-spaces:
+    - name: C
+      projection:
+        - [[M]]
+        - [[L]]
     - name: exp 
       projection: 
         - [[M]]

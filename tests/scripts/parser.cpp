@@ -59,14 +59,15 @@ int main(int argc, char* argv[])
 
   problem::TimeloopX::ParseWorkloads(problem, workloads);
 
-  workloads.Print();
   
   auto mapping = mapping::TimeloopX::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
   
   mapping.Print();
+  
+  workloads.Print();
 
   analysis::TimeloopX::NestAnalysis analysis(workloads, mapping);
-  analysis.get_alive_tensors();
+  analysis.get_tilewise_workloads();
   analysis.Print();
 
   std::cout << "Parser check passed!" << std::endl;
