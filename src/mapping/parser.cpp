@@ -2,14 +2,14 @@
 
 #include "mapping/arch-properties.hpp"
 
-#include "timeloopX/mapping/mapping.hpp"
+#include "tileflow/mapping/mapping.hpp"
 
 namespace mapping {
 
-namespace TimeloopX {
+namespace TileFlow {
 
 ArchProperties arch_props_;
-const problem::TimeloopX::Workloads* p_workloads_ = nullptr;
+const problem::TileFlow::Workloads* p_workloads_ = nullptr;
 
 void tolower(std::string& str){
     std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) {return std::tolower(c);});
@@ -28,7 +28,7 @@ ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope){
     else if (type_s.find("pipe") != std::string::npos) {
         type = Pipeline;
     }
-    else {TIMELOOPX_ERROR("ScopeNode type error. Should has type sequential/parallel");}
+    else {TILEFLOW_ERROR("ScopeNode type error. Should has type sequential/parallel");}
 
 }   
 
@@ -43,7 +43,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
         type = Spatial;
     }
     else {
-        TIMELOOPX_ERROR("Unknown Tile type" << type_s);
+        TILEFLOW_ERROR("Unknown Tile type" << type_s);
     }
 
     std::unordered_map<std::string, std::pair<int, int> > loop_bounds;
@@ -52,7 +52,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
         loop_bounds = ParseFactors(buffer);
     }
     else {
-        TIMELOOPX_ERROR("No factors");
+        TILEFLOW_ERROR("No factors");
     }
 
     std::vector<std::string> iters;
@@ -61,10 +61,10 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
     }
     else {
         for (auto& kv: loop_bounds) iters.push_back(kv.first);
-        TIMELOOPX_WARNING("No permutation specified. Infer instead.");
+        TILEFLOW_WARNING("No permutation specified. Infer instead.");
     }
     
-    TIMELOOPX_ASSERT(iters.size() == loop_bounds.size(), "permutation & factor iter mismatch");
+    TILEFLOW_ASSERT(iters.size() == loop_bounds.size(), "permutation & factor iter mismatch");
 
     storage_level_ = ParseStorageLevel(config);
 
@@ -72,7 +72,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
     config.lookupValue("split", split);
     for (unsigned i = 0; i < iters.size(); ++i) {
         loopnests_.emplace_back();
-        loop::TimeloopX::Descriptor& loop = loopnests_.back();
+        loop::TileFlow::Descriptor& loop = loopnests_.back();
         loop.name_ = iters[i];
         loop.start = 0;
         loop.end = loop_bounds[iters[i]].first;
@@ -191,7 +191,7 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
     std::string node_type; 
 
     if (!config.lookupValue("node-type", node_type)) {
-        TIMELOOPX_ERROR("No node-type is specified.");
+        TILEFLOW_ERROR("No node-type is specified.");
     }
     tolower(node_type);
 
@@ -206,7 +206,7 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
         node = new ScopeNode(config);
     }
     else {
-        TIMELOOPX_ERROR(node_type << " is not a valid type.");
+        TILEFLOW_ERROR(node_type << " is not a valid type.");
     }
         
     assert(node != nullptr);
@@ -223,7 +223,7 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
         }
     }
     else if (node_type != "op") {
-        TIMELOOPX_ERROR("Exist non-Op leaf node.");
+        TILEFLOW_ERROR("Exist non-Op leaf node.");
     }
 
     return node;
@@ -268,7 +268,7 @@ void OpNode::display(std::string prefix, bool recursive) const {
 
 Mapping ParseAndConstruct(config::CompoundConfigNode config,
                           model::Engine::Specs& arch_specs,
-                          const problem::TimeloopX::Workloads& workloads)
+                          const problem::TileFlow::Workloads& workloads)
 {
     arch_props_ = ArchProperties();
     arch_props_.Construct(arch_specs);
@@ -290,6 +290,6 @@ void Mapping::Print() {
 }
 
 
-} // namespace TimeloopX 
+} // namespace TileFlow 
 
 } // namespace mapping 

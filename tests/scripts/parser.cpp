@@ -6,9 +6,9 @@
 #include "compound-config/compound-config.hpp"
 #include "util/args.hpp"
 
-#include "timeloopX/problem/problem.hpp"
-#include "timeloopX/mapping/mapping.hpp"
-#include "timeloopX/loop-analysis/nest-analysis.hpp"
+#include "tileflow/problem/problem.hpp"
+#include "tileflow/mapping/mapping.hpp"
+#include "tileflow/loop-analysis/nest-analysis.hpp"
 
 extern bool gTerminateEval;
 
@@ -34,7 +34,7 @@ int main(int argc, char* argv[])
   auto root = config->getRoot();
   
   auto problem = root.lookup("problem");
-  problem::TimeloopX::Workloads workloads;
+  problem::TileFlow::Workloads workloads;
   
 
   config::CompoundConfigNode arch;
@@ -57,16 +57,16 @@ int main(int argc, char* argv[])
     std::cout << name << ",";
   std::cout << std::endl;
 
-  problem::TimeloopX::ParseWorkloads(problem, workloads);
+  problem::TileFlow::ParseWorkloads(problem, workloads);
 
   
-  auto mapping = mapping::TimeloopX::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
+  auto mapping = mapping::TileFlow::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
   
   mapping.Print();
   
   workloads.Print();
 
-  analysis::TimeloopX::NestAnalysis analysis(workloads, mapping);
+  analysis::TileFlow::NestAnalysis analysis(workloads, mapping);
   analysis.get_tilewise_workloads();
   analysis.Print();
 

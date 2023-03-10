@@ -5,13 +5,13 @@
 #include "mapping/mapping.hpp"
 
 
-#include "timeloopX/problem/problem.hpp"
-#include "timeloopX/mapping/loop.hpp"
-#include "timeloopX/common.hpp"
+#include "tileflow/problem/problem.hpp"
+#include "tileflow/mapping/loop.hpp"
+#include "tileflow/common.hpp"
 
 namespace mapping {
 
-namespace TimeloopX {
+namespace TileFlow {
 
 class ScopeNode;
 class TileNode;
@@ -83,7 +83,7 @@ public:
 private:
 
     // std::pair<int, int> represent the <end, residual end>
-    std::vector<loop::TimeloopX::Descriptor> loopnests_;
+    std::vector<loop::TileFlow::Descriptor> loopnests_;
     unsigned storage_level_;
     TileNode::type_t type;
 
@@ -100,7 +100,7 @@ public:
 class OpNode: public Node {
     std::string name_;
     int op_index_;
-    std::shared_ptr<problem::TimeloopX::Workload> p_workload;
+    std::shared_ptr<problem::TileFlow::Workload> p_workload;
     // op dimension --> runtime iteration
     std::unordered_map<std::string, std::string> binding_; 
 public:
@@ -108,7 +108,7 @@ public:
     void display(std::string prefix, bool recursive) const override;
     const std::string & get_name() const {return name_;}
     void accept(Visitor* visitor) const {visitor->visitOp(this);}
-    const std::shared_ptr<problem::TimeloopX::Workload>& get_workload() const {return p_workload;}
+    const std::shared_ptr<problem::TileFlow::Workload>& get_workload() const {return p_workload;}
 };
 
 struct Mapping {
@@ -120,7 +120,7 @@ struct Mapping {
 
 Mapping ParseAndConstruct(config::CompoundConfigNode config,
                           model::Engine::Specs& arch_specs,
-                          const problem::TimeloopX::Workloads& workload);
+                          const problem::TileFlow::Workloads& workload);
 
-}  // namespace TimeloopX  
+}  // namespace TileFlow  
 } // namespace mapping

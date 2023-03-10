@@ -4,7 +4,7 @@
 
 namespace loop {
 
-namespace TimeloopX{
+namespace TileFlow{
 
     class Descriptor: public loop::Descriptor {
     public: 
@@ -12,7 +12,7 @@ namespace TimeloopX{
         void Print(std::ostream& out, bool long_form = true) const;
     };
 
-} // namespace TimeloopX 
+} // namespace TileFlow 
 
 } // namespace loop 
 

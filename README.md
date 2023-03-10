@@ -1,4 +1,4 @@
-# TimeloopX  
+# TileFlow 
 
 This repo is an extension to `timeloop` to support more general simulation of tensor programs. 
 
@@ -11,24 +11,27 @@ sudo apt install scons libconfig++-dev libboost-dev libboost-iostreams-dev libbo
 
 2. install timeloop
 ```bash 
-git clone --recursive git@github.com:gulang2019/TimeloopX.git
-cd TimeloopX
-export TIMELOOPX_BASE=$(pwd)
+git clone git@github.com:pku-liang/TileFlow.git
+cd TimeFlow
+export TILEFLOW_BASE=$(pwd)
 
 # build timeloop
-cd 3rdparty/timeloop/src
+cd 3rdparty/
+git clone git@github.com:gulang2019/timeloop.git
+cd timeloop
 ln -s ../pat-public/src/pat .
 cd ..
 scons --accelergy -j4 --static [--d] # --d for debug build
+cp -r ./lib/ $TILEFLOW_BASE/lib
 
-cd $(TIMELOOPX_BASE)
+cd $TILEFLOW_BASE
 # build frontend parser 
 scons --accelergy -j4 --static --parser [--d]
-# build timeloopx: error now 
+# build tileflow: error now 
 scons --accelergy -j4 --static [--d] 
 
 # add bin to path 
-source ./env/setup-env.sh 
+source ./setup-env.sh 
 ```
 
 3. check installation 

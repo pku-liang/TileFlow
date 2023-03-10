@@ -1,8 +1,8 @@
-#include "timeloopX/mapping/mapping.hpp"
+#include "tileflow/mapping/mapping.hpp"
 
 namespace mapping {
     
-namespace TimeloopX {
+namespace TileFlow {
 
 void Visitor::visitScope(const ScopeNode* node){
     for (auto child: node->children_) 
@@ -41,6 +41,6 @@ loop::Nest TileNode::constructLoopNest(
 }
 
 
-} // namespace TimeloopX
+} // namespace TileFlow
 
 } // namespace mapping 

@@ -6,20 +6,20 @@
 #include "loop-analysis/nest-analysis.hpp"
 #include "loop-analysis/loop-state.hpp"
 
-#include "timeloopX/mapping/mapping.hpp"
-#include "timeloopX/common.hpp"
-#include "timeloopX/problem/problem.hpp"
+#include "tileflow/mapping/mapping.hpp"
+#include "tileflow/common.hpp"
+#include "tileflow/problem/problem.hpp"
 
-using mapping::TimeloopX::Node;
-using mapping::TimeloopX::OpNode;
-using mapping::TimeloopX::TileNode;
-using mapping::TimeloopX::ScopeNode;
-using mapping::TimeloopX::Visitor;
+using mapping::TileFlow::Node;
+using mapping::TileFlow::OpNode;
+using mapping::TileFlow::TileNode;
+using mapping::TileFlow::ScopeNode;
+using mapping::TileFlow::Visitor;
 
 
 namespace analysis {
 
-namespace TimeloopX {
+namespace TileFlow {
 
     struct NodeConfig {
         problem::Workload workload;
@@ -33,8 +33,8 @@ namespace TimeloopX {
             std::unordered_map<std::string, 
             problem::Shape::Projection> >  access_patterns;
 
-        problem::TimeloopX::Workloads& workloads_;
-        mapping::TimeloopX::Mapping& mapping_;
+        problem::TileFlow::Workloads& workloads_;
+        mapping::TileFlow::Mapping& mapping_;
         
         void add_access_pattern(
             problem::Shape::DataSpaceID producer_id, 
@@ -43,7 +43,7 @@ namespace TimeloopX {
             const Node* consumer,
             std::unordered_map<const Node*, std::vector<problem::Shape::DataSpaceID> >& access_pattern);
     public: 
-        NestAnalysis(problem::TimeloopX::Workloads& workloads_, mapping::TimeloopX::Mapping& mapping): workloads_(workloads_), mapping_(mapping){}
+        NestAnalysis(problem::TileFlow::Workloads& workloads_, mapping::TileFlow::Mapping& mapping): workloads_(workloads_), mapping_(mapping){}
         std::unordered_map<const Node*, NodeConfig> configs;
         /**
          * \brief set the alive_consors for Tile Nodes
@@ -58,7 +58,7 @@ namespace TimeloopX {
             int num_epochs_;
     };
 
-    class DatamovementCalculator: public mapping::TimeloopX::Visitor {
+    class DatamovementCalculator: public mapping::TileFlow::Visitor {
         NestAnalysis& analysis_;
         std::stack<problem::OperationSpace> deltas_;
         ScreenShot screen_shot_; 
@@ -87,14 +87,14 @@ namespace TimeloopX {
 
     
 
-    class CollectOpNode: public mapping::TimeloopX::Visitor {
+    class CollectOpNode: public mapping::TileFlow::Visitor {
         void visitOp(const OpNode*) override;
         std::vector<const OpNode*> opnodes_;
     public: 
         std::vector<const OpNode*> collectOpNodes(Node*);
     };
 
-    class Displayer: public mapping::TimeloopX::Visitor {
+    class Displayer: public mapping::TileFlow::Visitor {
         NestAnalysis & analysis_;
         void visitTile(const TileNode*) override;
         void visitScope(const ScopeNode*) override;
@@ -106,6 +106,6 @@ namespace TimeloopX {
     };
 
 
-} // namespace TimeloopX 
+} // namespace TileFlow 
 
 } // namespace analysis 

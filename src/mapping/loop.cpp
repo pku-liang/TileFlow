@@ -1,8 +1,8 @@
-#include "timeloopX/mapping/loop.hpp"
+#include "tileflow/mapping/loop.hpp"
 
 namespace loop{
 
-namespace TimeloopX {
+namespace TileFlow {
 
 void Descriptor::Print(std::ostream& out, bool long_form) const
 {
@@ -36,6 +36,6 @@ void Descriptor::Print(std::ostream& out, bool long_form) const
   }
 }
 
-} // namespace TimeloopX 
+} // namespace TileFlow 
 
 } // namespace loop

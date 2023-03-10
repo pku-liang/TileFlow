@@ -2,12 +2,12 @@
 
 #include "mapping/parser.hpp"
 
-#include "timeloopX/common.hpp"
+#include "tileflow/common.hpp"
 
 
 namespace problem {
 
-namespace TimeloopX {
+namespace TileFlow {
 
     typedef unsigned TensorIndex;
 
@@ -32,14 +32,14 @@ namespace TimeloopX {
     };
 
     class Workloads{
-        std::unordered_map<std::string, std::shared_ptr<problem::TimeloopX::Workload> > workloads_;
+        std::unordered_map<std::string, std::shared_ptr<problem::TileFlow::Workload> > workloads_;
         std::vector<std::string> ins_;
         std::vector<std::string> outs_;
         problem::Shape common_shape_;
 
     public:
-        bool add_workload(const std::string& name, std::shared_ptr<problem::TimeloopX::Workload>& workload);
-        std::shared_ptr<problem::TimeloopX::Workload> get_workload(const std::string & op_name) const {
+        bool add_workload(const std::string& name, std::shared_ptr<problem::TileFlow::Workload>& workload);
+        std::shared_ptr<problem::TileFlow::Workload> get_workload(const std::string & op_name) const {
             return workloads_.at(op_name);
         }
         void set_io(const std::vector<std::string>& ins, const std::vector<std::string>& outs);
@@ -54,6 +54,6 @@ namespace TimeloopX {
 
     void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads_);
 
-} // namespace TimeloopX 
+} // namespace TileFlow 
 
 } // namespace problem

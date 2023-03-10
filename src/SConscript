@@ -97,17 +97,17 @@ mapping/parser.cpp
 
 libenv = env.Clone()
 if GetOption("link_static"):
-    lib_timeloopX = libenv.StaticLibrary(target="timeloopX", source = lib_sources)
-    libenv.Install(env["BUILD_BASE_DIR"] + "/lib", [lib_timeloopX]) 
+    lib_tileflow = libenv.StaticLibrary(target="tileFlow", source = lib_sources)
+    libenv.Install(env["BUILD_BASE_DIR"] + "/lib", [lib_tileflow]) 
 else:
-    lib_timeloopX_shared = libenv.SharedLibrary(target = "timeloopX", source = lib_sources)
-    libenv.Install(env['BUILD_BASE_DIR'] + '/lib', [ lib_timeloopX_shared]) 
+    lib_tileflow_shared = libenv.SharedLibrary(target = "tileFlow", source = lib_sources)
+    libenv.Install(env['BUILD_BASE_DIR'] + '/lib', [ lib_tileflow_shared]) 
 
 model_sources = Split("""
 application/main.cpp
 application/model.cpp
 """)
 
-bin_model = env.Program(target = 'timeloopX', source = model_sources) 
+bin_model = env.Program(target = 'tileFlow', source = model_sources) 
 
 env.Install(env['BUILD_BASE_DIR'] + "/bin", [bin_model])

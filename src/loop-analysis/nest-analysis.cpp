@@ -1,10 +1,10 @@
 #include <stack>
 
-#include "timeloopX/loop-analysis/nest-analysis.hpp"
+#include "tileflow/loop-analysis/nest-analysis.hpp"
 
 namespace analysis {
 
-namespace TimeloopX {
+namespace TileFlow {
 
     std::vector<const OpNode*> CollectOpNode::collectOpNodes(Node* root) {
         opnodes_.clear();
@@ -32,7 +32,7 @@ namespace TimeloopX {
         for (auto node: opnodes) {
             auto & ptr = node->get_workload();
             for (auto& t: ptr->get_ins()){
-                TIMELOOPX_ASSERT(tensor2producer.count(t), "Op " << node->get_name() << "'s input " << t << " is unclear");
+                TILEFLOW_ASSERT(tensor2producer.count(t), "Op " << node->get_name() << "'s input " << t << " is unclear");
                 auto producer = tensor2producer[t];
                 problem::Shape::DataSpaceID producer_id = producer->get_type() == Node::Op? 
                     workloads_.get_shape().DataSpaceNameToID.at(static_cast<const OpNode*>(producer)->get_name() + "::" + t):
@@ -44,7 +44,7 @@ namespace TimeloopX {
         }
 
         for (auto& t: workloads_.get_outs()) {
-            TIMELOOPX_ASSERT(tensor2producer.count(t), "Output " << t << " is unclear");
+            TILEFLOW_ASSERT(tensor2producer.count(t), "Output " << t << " is unclear");
             auto producer_op_name = static_cast<const OpNode*>(tensor2producer[t])->get_name();
             int id = workloads_.get_shape().DataSpaceNameToID.at(producer_op_name + "::" + t);
             add_access_pattern(id, tensor2producer[t], problem::Shape::DataSpaceID(-1), mapping_.root, access_pattern);
@@ -146,7 +146,7 @@ namespace TimeloopX {
     void DatamovementCalculator::visitOp(const OpNode* node){}
 
     void DatamovementCalculator::visitTile(const TileNode* node){
-        analysis::TimeloopX::PerfectLoopnestAnalyzer analyzer(*this);
+        analysis::TileFlow::PerfectLoopnestAnalyzer analyzer(*this);
         auto& config = analysis_.configs[node];
         auto loopnest = node->constructLoopNest(analysis_.workloads_.get_shape().FactorizedDimensionNameToID);
         analyzer.init(&config.workload, &loopnest, analysis_.mapping_.fanoutX_map, analysis_.mapping_.fanoutY_map);
@@ -205,6 +205,6 @@ namespace TimeloopX {
         working_sets_computed_ = true;
     }
 
-} // namespace TimeloopX 
+} // namespace TileFlow 
 
 } // namespace analysis 

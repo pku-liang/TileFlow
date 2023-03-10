@@ -75,7 +75,7 @@ Application::Application(config::CompoundConfig* config,
 
   // Problem configuration.
   auto problem = rootNode.lookup("problem");
-  problem::TimeloopX::ParseWorkloads(problem, workloads_);
+  problem::TileFlow::ParseWorkloads(problem, workloads_);
 
   if (verbose_)
     std::cout << "Problem configuration complete." << std::endl;
