@@ -19,6 +19,10 @@ void Visitor::visitTile(const TileNode* node){
         child->accept(this);
 }
 
+void Visitor::run(const Node* root) {
+    root->accept(this);
+}
+
 loop::Nest TileNode::constructLoopNest(
     const std::map<std::string, problem::Shape::FactorizedDimensionID> & name2id) const{
     std::uint64_t storage_level = 0;
@@ -37,6 +41,7 @@ loop::Nest TileNode::constructLoopNest(
     if (num_subnests_added == 0) {
         loop_nest.AddLoop(0, 0, 1, 1, spacetime::Dimension::Time);
     }
+    loop_nest.AddStorageTilingBoundary();
     return loop_nest;
 }
 

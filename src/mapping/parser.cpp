@@ -284,6 +284,7 @@ Mapping ParseAndConstruct(config::CompoundConfigNode config,
 
 void Mapping::Print() {
     std::cout << "-----------------Mapping---------------" << std::endl;
+    std::cout << "root: " << root << std::endl;
     root->display("");
     std::cout << "---------------------------------------" << std::endl;
 

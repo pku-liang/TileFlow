@@ -35,15 +35,6 @@ std::string ParseWorkload(config::CompoundConfigNode config, problem::TileFlow::
 
   workload.set_io(Split(ins), Split(out));
 
-  if (config.exists("instance")) {
-    auto factorized_bound = config.lookup("instance");
-    problem::ParseWorkloadInstance(factorized_bound, workload);  
-  }
-  else { 
-    std::cerr << "ERROR: no instance passed for an op. Please make sure an instance is passed for each op." << std::endl;
-    exit(1);
-  }
-
   return name;
 }
 
@@ -72,6 +63,32 @@ void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads) {
     std::string name = problem::TileFlow::ParseWorkload(config, *p_workload);
     assert(workloads.add_workload(name, p_workload));
   }
+
+  std::vector<std::string> dims;
+  if (config.exists("dimensions")) {
+    config.lookupArrayValue("dimensions", dims);
+  }
+  else {
+    TILEFLOW_ERROR("no dimensions passed for the workloads.");
+  }
+
+  if (config.exists("instance")) {
+    auto factorized_bounds = config.lookup("instance");
+    for (auto dim: dims) {
+      TILEFLOW_ASSERT(factorized_bounds.exists(dim), "no instance passed for axis " << dim << ".");
+      int bound;
+      factorized_bounds.lookupValue(dim, bound);
+      workloads.set_factorized_bound(dim, bound); 
+    }
+  }
+  else { 
+    std::cerr << "ERROR: no instance passed for an op. Please make sure an instance is passed for each op." << std::endl;
+    exit(1);
+  }
+
+  if (config.exists("coefficient")) {
+    workloads.set_coeff(config.lookup("coefficient"));
+  }
 }
 
 bool Workloads::add_workload(const std::string & name, std::shared_ptr<Workload>& workload) {
@@ -97,16 +114,21 @@ void Workload::set_io(const std::vector<std::string>& ins, const std::vector<std
 
 void Workloads::Print() {
   std::cout << "--------------Workloads------------" << std::endl;
-  std::cout << "ins: ";
-  for (auto t: ins_) {
-    std::cout << t << ",";
-  }
+  std::cout << "dimensions:";
+  for (auto& kv: factorized_bounds) 
+    std::cout << "[" << common_shape_.FactorizedDimensionIDToName[kv.first] 
+      << "," << kv.second << "]";
   std::cout << std::endl;
-  std::cout << "outs: ";
-  for (auto t: outs_) {
-    std::cout << t << ",";
-  }
-  std::cout << std::endl;
+  // std::cout << "ins: ";
+  // for (auto t: ins_) {
+  //   std::cout << t << ",";
+  // }
+  // std::cout << std::endl;
+  // std::cout << "outs: ";
+  // for (auto t: outs_) {
+  //   std::cout << t << ",";
+  // }
+  // std::cout << std::endl;
   std::cout << "Tensors:" << std::endl;
   for (int i = 0; i < common_shape_.NumDataSpaces; ++i) {
     std::cout << "  " << common_shape_.DataSpaceIDToName[i];
@@ -147,8 +169,17 @@ void Workload::apply_binding(const std::unordered_map<std::string, std::string>&
     TILEFLOW_ASSERT(binding.count(kv.first), kv.first << " of op " << name_ << " is not bond to any runtime iteration.");
     std::string iter = binding.at(kv.first);
     if (!common_shape_.FactorizedDimensionNameToID.count(iter)){
-      common_shape_.FactorizedDimensionIDToName[common_shape_.NumFactorizedDimensions] = iter;
-      common_shape_.FactorizedDimensionNameToID[iter] = common_shape_.NumFactorizedDimensions++;
+      problem::Shape::FactorizedDimensionID factorized_id = common_shape_.NumFactorizedDimensions;
+      assert(!common_shape_.FactorizedToFlattened.count(factorized_id));
+      problem::Shape::FlattenedDimensionID flattened_id = common_shape_.NumFlattenedDimensions;
+      common_shape_.FactorizedDimensionIDToName[factorized_id] = iter;
+      common_shape_.FactorizedDimensionNameToID[iter] = factorized_id;
+      common_shape_.FlattenedDimensionIDToName[flattened_id] = iter;
+      common_shape_.FlattenedDimensionNameToID[iter] = flattened_id++;
+      common_shape_.FlattenedToFactorized.push_back({factorized_id});
+      common_shape_.FactorizedToFlattened[factorized_id] = flattened_id;
+      common_shape_.NumFlattenedDimensions++;
+      common_shape_.NumFactorizedDimensions++;
     }
   }
 
@@ -187,6 +218,25 @@ void Workload::apply_binding(const std::unordered_map<std::string, std::string>&
   binding_applied = true;
 }
 
+void Workloads::set_factorized_bound(const std::string& dim, int bound) {
+  if (common_shape_.FactorizedDimensionNameToID.count(dim) == 0) {
+    common_shape_.FactorizedDimensionNameToID[dim] = common_shape_.NumFactorizedDimensions;
+    common_shape_.FactorizedDimensionIDToName[common_shape_.NumFactorizedDimensions] = dim;
+    assert(common_shape_.FactorizedToFlattened.count(common_shape_.NumFactorizedDimensions) == 0);
+    common_shape_.FactorizedToFlattened[common_shape_.NumFactorizedDimensions] = common_shape_.NumFlattenedDimensions;
+    common_shape_.FlattenedToFactorized.push_back({common_shape_.NumFactorizedDimensions});
+    common_shape_.NumFlattenedDimensions ++;
+    common_shape_.NumFactorizedDimensions ++;
+  }
+  factorized_bounds[common_shape_.FactorizedDimensionNameToID[dim]] = bound;
+}
+
 } // namespace TileFlow 
 
 } // namespace problem 
+
+/**
+ * 1. GetCoefficient
+ * 2. vector_stride_ scale
+ * 3. lifting loopnest computation;
+*/

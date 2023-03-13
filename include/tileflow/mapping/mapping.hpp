@@ -13,6 +13,7 @@ namespace mapping {
 
 namespace TileFlow {
 
+class Node;
 class ScopeNode;
 class TileNode;
 class OpNode;
@@ -25,6 +26,8 @@ protected:
     friend class TileNode;
     friend class ScopeNode;
     friend class OpNode;
+public:
+    virtual void run (const Node*);
 };
 
 class Node {
@@ -92,6 +95,7 @@ public:
     void display(std::string prefix, bool recursive) const override;
     void accept(Visitor* visitor) const {visitor->visitTile(this);}
     bool is_spatial() const {return type == Spatial;}
+    unsigned get_storage_level() const {return storage_level_;}
     loop::Nest constructLoopNest(
         const std::map<std::string, problem::Shape::FactorizedDimensionID>&) const;
     size_t n_level() const {return loopnests_.size();}

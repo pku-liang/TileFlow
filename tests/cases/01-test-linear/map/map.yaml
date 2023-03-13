@@ -1,0 +1,19 @@
+mapping:
+  node-type: Tile 
+  type: temporal 
+  factors: M=8 N=8 K=8
+  permutation: MNK 
+  target: MainMemory 
+      
+
+  subtree: 
+  - node-type: Tile 
+    type: temporal  
+    factors: M=16 N=16 K=16
+    permutation: MKN 
+    target: RegFile
+    
+    subtree:
+    - node-type: Op
+      name: GEMM 
+      binding: M:M N:N K:K 

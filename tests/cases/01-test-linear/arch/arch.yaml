@@ -1,0 +1,31 @@
+architecture: 
+  version: 0.2 
+
+  subtree:
+  - name: System
+    
+    local: 
+    - name: MainMemory
+      class: DRAM 
+      attributes:
+        width: 256 
+        block-size: 32
+        word-bits: 8
+      
+    subtree:
+    - name: PE
+
+      local: 
+      - name: RegFile
+        class: regfile 
+        attributes:
+          depth: 64 
+          width: 16 
+          word-bits: 8
+          read_bandwidth: 2
+          write_bandwidth: 2
+
+      - name: mac 
+        class: intmac 
+        attributes: 
+          datawidth: 16 
