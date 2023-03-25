@@ -57,17 +57,20 @@ int main(int argc, char* argv[])
     std::cout << name << ",";
   std::cout << std::endl;
 
+  workloads.Print();
+
   problem::TileFlow::ParseWorkloads(problem, workloads);
 
-  
   auto mapping = mapping::TileFlow::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
   
+  // problem::Workload::SetCurrShape(&workloads.get_shape());
+
   mapping.Print();
   
   workloads.Print();
 
-  analysis::TileFlow::NestAnalysis analysis(workloads, mapping);
-  analysis.get_tilewise_workloads();
+  analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_);
+  analysis.analyze();
   analysis.Print();
 
   std::cout << "Parser check passed!" << std::endl;

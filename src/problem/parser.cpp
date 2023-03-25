@@ -150,6 +150,9 @@ void Workloads::Print() {
   for (auto& ptr: workloads_) {
     ptr.second->Print();
   }
+  std::cout << "UseFlattening: " << common_shape_.UsesFlattening << std::endl;
+  std::cout << "Shape:" << std::endl;
+  common_shape_.show();
   std::cout << "------------End Workloads----------" << std::endl;
 }
 
@@ -175,14 +178,14 @@ void Workload::apply_binding(const std::unordered_map<std::string, std::string>&
       common_shape_.FactorizedDimensionIDToName[factorized_id] = iter;
       common_shape_.FactorizedDimensionNameToID[iter] = factorized_id;
       common_shape_.FlattenedDimensionIDToName[flattened_id] = iter;
-      common_shape_.FlattenedDimensionNameToID[iter] = flattened_id++;
+      common_shape_.FlattenedDimensionNameToID[iter] = flattened_id;
       common_shape_.FlattenedToFactorized.push_back({factorized_id});
       common_shape_.FactorizedToFlattened[factorized_id] = flattened_id;
       common_shape_.NumFlattenedDimensions++;
       common_shape_.NumFactorizedDimensions++;
     }
   }
-
+  
   for (auto& kv: shape_.CoefficientNameToID) {
     std::string coeff_name = name_ + "::" + kv.first;
     common_shape_.CoefficientIDToName[common_shape_.NumCoefficients] = coeff_name;
@@ -222,7 +225,10 @@ void Workloads::set_factorized_bound(const std::string& dim, int bound) {
   if (common_shape_.FactorizedDimensionNameToID.count(dim) == 0) {
     common_shape_.FactorizedDimensionNameToID[dim] = common_shape_.NumFactorizedDimensions;
     common_shape_.FactorizedDimensionIDToName[common_shape_.NumFactorizedDimensions] = dim;
-    assert(common_shape_.FactorizedToFlattened.count(common_shape_.NumFactorizedDimensions) == 0);
+    common_shape_.FlattenedDimensionIDToName[common_shape_.NumFlattenedDimensions] = dim;
+    common_shape_.FlattenedDimensionNameToID[dim] = common_shape_.NumFlattenedDimensions;
+    common_shape_.FlattenedToFactorized.push_back({common_shape_.NumFactorizedDimensions});
+    common_shape_.FactorizedToFlattened[common_shape_.NumFlattenedDimensions] = common_shape_.NumFactorizedDimensions;
     common_shape_.FactorizedToFlattened[common_shape_.NumFactorizedDimensions] = common_shape_.NumFlattenedDimensions;
     common_shape_.FlattenedToFactorized.push_back({common_shape_.NumFactorizedDimensions});
     common_shape_.NumFlattenedDimensions ++;

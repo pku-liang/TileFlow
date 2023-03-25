@@ -1,0 +1,25 @@
+problem:
+  io:
+    ins: Input, Kernel
+    outs: Output
+  dimensions: [K,R]
+  instance:
+    K: 128
+    R: 3
+
+  ops:
+  - name: Conv1D
+    dimensions: [K,R] 
+    data-spaces:
+    - name: Output
+      projection:
+        - [[K]]
+      read-write: True 
+    - name: Input 
+      projection:
+        - [[K],[R]]
+    - name: Kernel
+      projection:
+        - [[R]]
+    ins: Input, Kernel
+    out: Output

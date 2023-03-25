@@ -65,16 +65,21 @@ public:
 };
 
 class ScopeNode: public Node {
-    public:
+public:
     enum type_t {
         Sequential,
+        Sharing,
         Parallel,
         Pipeline
-    }type;
-
+    };
     ScopeNode(config::CompoundConfigNode config);
     void display(std::string prefix, bool recursive) const override;
     void accept(Visitor* visitor) const {visitor->visitScope(this);}
+    ScopeNode::type_t get_scope_type() const {return type;}
+
+private: 
+    ScopeNode::type_t type;
+    
 };
 
 class TileNode: public Node {
@@ -99,6 +104,7 @@ public:
     loop::Nest constructLoopNest(
         const std::map<std::string, problem::Shape::FactorizedDimensionID>&) const;
     size_t n_level() const {return loopnests_.size();}
+    const std::vector<loop::TileFlow::Descriptor>& get_loops() const {return loopnests_;}
 };
 
 class OpNode: public Node {

@@ -45,7 +45,6 @@ loop::Nest TileNode::constructLoopNest(
     return loop_nest;
 }
 
-
 } // namespace TileFlow
 
 } // namespace mapping 

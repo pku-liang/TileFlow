@@ -1,7 +1,7 @@
 mapping:
   node-type: Tile 
   type: temporal 
-  factors: M=8 N=8 K=8
+  factors: M=8 N=16 K=32
   permutation: MNK 
   target: MainMemory 
       
@@ -9,7 +9,7 @@ mapping:
   subtree: 
   - node-type: Tile 
     type: temporal  
-    factors: M=16 N=16 K=16
+    factors: M=16 N=8 K=4
     permutation: MKN 
     target: RegFile
     

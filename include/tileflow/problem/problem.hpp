@@ -40,6 +40,7 @@ namespace TileFlow {
         config::CompoundConfigNode coeffs_;
 
     public:
+        Workloads() {common_shape_.UsesFlattening = false;}
         bool add_workload(const std::string& name, std::shared_ptr<problem::TileFlow::Workload>& workload);
         std::shared_ptr<problem::TileFlow::Workload> get_workload(const std::string & op_name) const {
             return workloads_.at(op_name);

@@ -30,27 +30,46 @@ namespace analysis
 
         void NestAnalysis::analyze()
         {
+            problem::Workload::SetCurrShape(&workloads_.get_shape());
             get_loopnest();
-            get_tilewise_workloads();
             get_dimscale();
+            get_active_tensors();
+            get_storage_level();
+            get_spatial_offsets();
             get_datamovement();
+        }
+
+        void NestAnalysis::get_storage_level() {
+            StorageLevelCalculator pass(*this);
+            pass.run(mapping_.root);
+        }
+
+        void NestAnalysis::get_spatial_offsets() {
+            SpatialOffsetsCalculator pass(*this);
+            pass.run(mapping_.root);
         }
 
         void NestAnalysis::get_datamovement()
         {
-            problem::Workload::SetCurrShape(&workloads_.get_shape());
-            DatamovementCalculator dm(*this);
+            problem::Workload::Coefficients coeff_;
+            auto &shape_ = workloads_.get_shape();
+            coeff_[(unsigned)-1] = 1;
+            for (auto &kv : shape_.CoefficientIDToName)
+            {
+                coeff_[kv.first] = workloads_.lookup_coeff(kv.second);
+            }
+            problem::Workload workload;
+            workload.SetShape(shape_);
+            workload.SetCoefficients(coeff_);
+            workload.SetFactorizedBounds(workloads_.get_factorized_bound());
+            workload.DeriveFlattenedBounds();
+            DatamovementCalculator dm(*this, workload);
             dm.run(mapping_.root);
         }
 
-        void NestAnalysis::get_tilewise_workloads()
+        void NestAnalysis::get_active_tensors()
         {
             std::vector<const OpNode *> opnodes = CollectOpNode().collectOpNodes(mapping_.root);
-            std::cout << "Ops: " << std::endl;
-            for (auto node : opnodes)
-            {
-                node->display("", false);
-            }
             std::unordered_map<std::string, const Node *> tensor2producer;
             for (auto &t : workloads_.get_ins())
             {
@@ -66,9 +85,11 @@ namespace analysis
                 {
                     TILEFLOW_ASSERT(tensor2producer.count(t), "Op " << node->get_name() << "'s input " << t << " is unclear");
                     auto producer = tensor2producer[t];
-                    problem::Shape::DataSpaceID producer_id = producer->get_type() == Node::Op ? workloads_.get_shape().DataSpaceNameToID.at(static_cast<const OpNode *>(producer)->get_name() + "::" + t) : problem::Shape::DataSpaceID(-1);
+                    problem::Shape::DataSpaceID producer_id = producer->get_type() == Node::Op ? 
+                        workloads_.get_shape().DataSpaceNameToID.at(static_cast<const OpNode *>(producer)->get_name() + "::" + t) :
+                        problem::Shape::DataSpaceID(-1);
                     problem::Shape::DataSpaceID consumer_id = workloads_.get_shape().DataSpaceNameToID.at(node->get_name() + "::" + t);
-                    add_access_pattern(producer_id, producer, consumer_id, node, access_pattern);
+                    add_access_pattern(producer_id, producer, consumer_id, node);
                 }
                 tensor2producer[ptr->get_out()] = node;
             }
@@ -78,58 +99,17 @@ namespace analysis
                 TILEFLOW_ASSERT(tensor2producer.count(t), "Output " << t << " is unclear");
                 auto producer_op_name = static_cast<const OpNode *>(tensor2producer[t])->get_name();
                 int id = workloads_.get_shape().DataSpaceNameToID.at(producer_op_name + "::" + t);
-                add_access_pattern(id, tensor2producer[t], problem::Shape::DataSpaceID(-1), mapping_.root, access_pattern);
-            }
-
-            problem::Workload::Coefficients coeff_;
-            auto & shape_ = workloads_.get_shape();
-            coeff_[(unsigned)-1] = 1;
-            for (auto& kv: shape_.CoefficientIDToName) {
-                coeff_[kv.first] = workloads_.lookup_coeff(kv.second);
-            }
-
-            for (auto &kv : access_pattern)
-            {
-                problem::Shape shape(shape_);
-                std::vector<problem::Shape::DataSpaceID> ids;
-
-                for (auto &id_name : shape.DataSpaceIDToName)
-                {
-                    if (find(kv.second.begin(), kv.second.end(), id_name.first) != kv.second.end())
-                        ids.push_back(id_name.first);
-                }
-                std::map<problem::Shape::FactorizedDimensionID, std::string> DataSpaceIDToName;
-                std::map<std::string, problem::Shape::FactorizedDimensionID> DataSpaceNameToID;
-                std::vector<problem::Shape::Projection> projections;
-
-                for (int i = 0; i < (int)ids.size(); ++i)
-                {
-                    int id = ids[i];
-                    DataSpaceIDToName[i] = shape.DataSpaceIDToName[id];
-                    DataSpaceNameToID[DataSpaceIDToName[i]] = i;
-                    projections.push_back(shape.Projections[id]);
-                }
-                shape.DataSpaceIDToName = std::move(DataSpaceIDToName);
-                shape.DataSpaceNameToID = std::move(DataSpaceNameToID);
-                shape.Projections = std::move(projections);
-
-                auto &workload = configs[kv.first].workload;
-                workload.SetShape(shape);
-                workload.SetCoefficients(coeff_);
-                workload.SetFactorizedBounds(workloads_.get_factorized_bound());
-                workload.DeriveFlattenedBounds();
-                configs[kv.first].global_dataspace_ids = std::move(ids);
+                add_access_pattern(id, tensor2producer[t], problem::Shape::DataSpaceID(-1), mapping_.root);
             }
         }
-
 
         void NestAnalysis::add_access_pattern(
             problem::Shape::DataSpaceID producer_id,
             const Node *producer,
             problem::Shape::DataSpaceID consumer_id,
-            const Node *consumer,
-            std::unordered_map<const Node *, std::vector<problem::Shape::DataSpaceID>> &access_pattern)
+            const Node *consumer)
         {
+            
             std::stack<const Node *> sp, sc;
             while (producer)
             {
@@ -158,22 +138,25 @@ namespace analysis
                     break;
             }
 
-            while (!sc.empty())
-            {
-                auto node = sc.top();
-                access_pattern[node].push_back(consumer_id);
-                sc.pop();
-            }
+            if (consumer_id != problem::Shape::DataSpaceID(-1))
+                while (!sc.empty())
+                {
+                    auto node = sc.top();
+                    configs[node].active_tensors.push_back(consumer_id);
+                    sc.pop();
+                }
 
-            while (!sp.empty())
-            {
-                auto node = sp.top();
-                access_pattern[node].push_back(producer_id);
-                sp.pop();
-            }
+            if (producer_id != problem::Shape::DataSpaceID(-1))
+                while (!sp.empty())
+                {
+                    auto node = sp.top();
+                    configs[node].active_tensors.push_back(producer_id);
+                    sp.pop();
+                }
         }
 
-        void NestAnalysis::get_dimscale() {
+        void NestAnalysis::get_dimscale()
+        {
             DimScaleCalculator pass(*this);
             pass.run(mapping_.root);
         }
@@ -181,6 +164,12 @@ namespace analysis
         void NestAnalysis::Print()
         {
             std::cout << "-----------------Nest Analysis----------------" << std::endl;
+            std::cout << "ComputeInfo:" << std::endl;
+            for (auto& kv: compute_info_) {
+                for (auto& spatial_id: kv.first) std::cout << spatial_id << ",";
+                std::cout << ":";
+                std::cout << kv.second.accesses << std::endl;
+            }
             Displayer(*this).display();
             std::cout << "--------------END Nest Analysis---------------" << std::endl;
         }
@@ -191,10 +180,31 @@ namespace analysis
             auto &configs_ = analysis_.configs;
             if (configs_.count(node))
             {
-                auto shape = configs_.at(node).workload.GetShape();
-                for (auto t : shape->DataSpaceNameToID)
-                {
-                    std::cout << t.first << ",";
+                auto &config = configs_[node];
+                auto& shape = analysis_.workloads_.get_shape();
+                std::cout << "tensors:";
+                for (auto id : config.active_tensors)
+                    std::cout << shape.DataSpaceIDToName.at(id) << ",";
+                std::cout << "storage:" << analysis_.arch_specs_.topology.LevelNames()[config.storage_level];
+                std::cout << ",X:" << config.fanout_x << ",Y:" << config.fanout_y;
+                std::cout << ",x:" << config.spatial_offset_x << ",y:" << config.spatial_offset_y;
+                if (node->get_type() == TileNode::Temporal){
+                    for (unsigned pv = 0; pv < shape.NumDataSpaces; pv++) {
+                        int accesses = config.access_stats_[pv](1,1).accesses;
+                        if (accesses) {
+                            if (!shape.DataSpaceIDToName.count(pv)) {
+                                std::cout << "ERROR at " << pv << " in " << std::endl;
+                                shape.show();
+                            }
+                            std::cout << shape.DataSpaceIDToName.at(pv) << ":" << accesses << ",";
+                        }
+                    }
+                }
+                std::cout << std::endl;
+                std::cout << "loops:";
+                for (auto loop: config.loop_nest.loops) {
+                    std::cout << "[" << loop.start << ", " << loop.end << "," << loop.stride
+                         << "|" <<  loop.dimension << "],";
                 }
                 std::cout << std::endl;
             }
@@ -222,381 +232,208 @@ namespace analysis
             node->display(prefix_, false);
         }
 
-        void DatamovementCalculator::run(const Node* root)
+        void DatamovementCalculator::run(const Node *root)
         {
-            screen_shot_.num_epochs_ = 1;
-            screen_shot_.node = root;
-            for (unsigned dim = 0; 
-                dim < problem::GetShape()->NumFlattenedDimensions; dim++)
+            MemoryState::set_workload(&workload_);
+            InputParam input;
+            input.num_epochs_ = 1;
+            for (unsigned dim = 0;
+                 dim < problem::GetShape()->NumFlattenedDimensions; dim++)
             {
-                screen_shot_.cur_transform_[dim] = 0;
+                input.cur_transform_[dim] = 0;
             }
+            input.curr_node_ = root;
+            input_stack_.push(input);
             root->accept(this);
         }
 
         void DatamovementCalculator::visitOp(const OpNode *node)
         {
-            assert(screen_shot_.node == node);
-            compute_info_[screen_shot_.space_stamp_].accesses += screen_shot_.num_epochs_;
-            deltas_.push(problem::OperationSpace(node->get_workload().get()));
+            auto input = input_stack_.top();
+            assert(input.curr_node_ == node);
+            input_stack_.pop();
+            std::cout << "visitOp:" << std::endl;
+            std::cout << input << std::endl;
+            analysis_.compute_info_[input.space_stamp_].accesses += input.num_epochs_;
+
+            // Add a musk here.
+            RetVal ret;
+            auto & active_tensors = analysis_.configs.at(node).active_tensors;
+            problem::OperationSpace point_set(MemoryState::workload_,
+                 input.cur_transform_, input.cur_transform_); // A single point
+            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++) {
+                if (find(active_tensors.begin(), active_tensors.end(), pv) 
+                    == active_tensors.end()) 
+                    point_set.GetDataSpace(pv).Reset();
+            }
+            ret.last_working_set_.insert(0, point_set);
+            ret.deltas_ = ret.last_working_set_ - input.init_working_set_;
+
+            ret_stack_.push(ret);
         }
 
         void DatamovementCalculator::visitTile(const TileNode *node)
         {
-            assert(screen_shot_.node == node);
+            auto &input = input_stack_.top();
+            assert(input.curr_node_ == node);
+            analysis::TileFlow::PerfectLoopnestAnalyzer analyzer(*this, input, analysis_.configs[node]);
             auto &config = analysis_.configs[node];
-            analysis::TileFlow::PerfectLoopnestAnalyzer analyzer(*this);
-            std::map<unsigned, uint64_t> fanoutX_map, fanoutY_map;
-            unsigned storage_level = node->get_storage_level();
-            fanoutX_map[storage_level] = analysis_.mapping_.fanoutX_map[storage_level];
-            fanoutY_map[storage_level] = analysis_.mapping_.fanoutY_map[storage_level];
-            analyzer.init(&config.workload, &config.loop_nest, fanoutX_map, fanoutY_map);
-            analyzer.calculateDataMovement();
+            analyzer.init(&workload_, &config.loop_nest);
+            auto ret = analyzer.calculateDataMovement();
+            ret_stack_.push(ret);
         }
 
         void DatamovementCalculator::visitScope(const ScopeNode *node)
         {
-            assert(screen_shot_.node == node);
-            std::vector<problem::OperationSpace> deltas;
-            for (auto &child : node->get_children())
+            auto input = input_stack_.top();
+            assert(input.curr_node_ == node);
+            input_stack_.pop();
+            auto type = node->get_scope_type();
+            auto ret_ = RetVal();
+            if (type == ScopeNode::Sequential)
             {
-                screen_shot_.node = child;
-                child->accept(this);
-                deltas.emplace_back(deltas_.top());
-                deltas_.pop();
+                for (auto &child : node->get_children())
+                {
+                    input.curr_node_ = child;
+                    input_stack_.push(input);
+                    child->accept(this);
+                    auto ret = ret_stack_.top();
+                    ret_stack_.pop();
+                    ret_.deltas_.Add(ret.deltas_);
+                    input.init_working_set_ = ret.last_working_set_;
+                }
+                ret_.last_working_set_ = input.init_working_set_;
             }
-            screen_shot_.node = node;
-            deltas_.push(combineDeltas(deltas, node->type));
+            else if (type == ScopeNode::Parallel)
+            {
+                for (auto &child : node->get_children())
+                {
+                    input.curr_node_ = child;
+                    input_stack_.push(input);
+                    child->accept(this);
+                    auto ret = ret_stack_.top();
+                    ret_stack_.pop();
+                    ret_.deltas_.Add(ret.deltas_);
+                    ret_.last_working_set_.Union(ret.last_working_set_);
+                }
+            }
+            else if (type == ScopeNode::Sharing)
+            {
+                for (auto &child : node->get_children())
+                {
+                    input.curr_node_ = child;
+                    input_stack_.push(input);
+                    child->accept(this);
+                    auto ret = ret_stack_.top();
+                    ret_stack_.pop();
+                    ret_.last_working_set_.Union(ret.last_working_set_);
+                }
+                ret_.deltas_ = ret_.last_working_set_.Substract(input.init_working_set_);
+            }
+            else if (type == ScopeNode::Pipeline)
+            { // other schema's children shares the memory
+                // 0, 1, ..., children.size() - 1
+                /*
+                0  1  2  3  4
+                p1          0
+                p2 p1       1
+                p3 p2 p1    2
+                   p3 p2 p1 3
+                      p3 p2 4
+                         p3 5
+                [:i]
+                1 p0 p1 p0 ... pk pk-1, ..., p1;
+                2 pk-1, ..., p0;
+                ...
+                N+1-k pk-1 ... p0
+                ...
+                N-1 pk-1, pk-2
+                N pk-1
+                */
+                for (auto &child : node->get_children())
+                {
+                    input.curr_node_ = child;
+                    input_stack_.push(input);
+                    child->accept(this);
+                    auto ret = ret_stack_.top();
+                    ret_stack_.pop();
+                    ret_.deltas_.Union(ret.deltas_);
+                    ret_.last_working_set_.Union(ret.last_working_set_);
+                }
+            }
+
+            ret_stack_.push(ret_);
         }
 
-        problem::OperationSpace DatamovementCalculator::combineDeltas(
-            const std::vector<problem::OperationSpace> &deltas,
-            ScopeNode::type_t type)
+        RetVal DatamovementCalculator::computeDelta(const InputParam &input)
         {
-            if (type == ScopeNode::Parallel || type == ScopeNode::Pipeline)
-            {
-                return deltas.front();
-            }
-            else if (type == ScopeNode::Sequential)
-            {
-                return deltas.front();
-            }
-        }
-
-        problem::OperationSpace DatamovementCalculator::computeDelta(const ScreenShot &screen_shot)
-        {
-            auto old_screen_shot = std::move(screen_shot_);
-            screen_shot_ = screen_shot;
-            screen_shot_.node->accept(this);
-            screen_shot_ = std::move(old_screen_shot);
-            assert(!deltas_.empty());
-            auto ret = deltas_.top();
-            deltas_.pop();
+            input_stack_.push(input);
+            input.curr_node_->accept(this);
+            auto ret = ret_stack_.top();
+            ret_stack_.pop();
             return ret;
         }
 
-        void PerfectLoopnestAnalyzer::init(problem::Workload *wl, loop::Nest *nest,
-                                           std::map<unsigned, std::uint64_t> fanoutX_map,
-                                           std::map<unsigned, std::uint64_t> fanoutY_map)
+        void PerfectLoopnestAnalyzer::init(problem::Workload *wl, loop::Nest *nest)
         {
             problem::Workload::SetCurrShape(wl->GetShape());
-            Init(wl, nest, fanoutX_map, fanoutY_map);
-            num_epochs_ = dm.screen_shot_.num_epochs_;
+            workload_ = wl;
+
+            Reset();
+            cached_nest = *nest;
+
+            // Copy over everything we need from the nest.
+            storage_tiling_boundaries_ = nest->storage_tiling_boundaries;
+            packed_skew_descriptors_ = nest->skew_descriptors;
+            no_link_transfer_ = nest->no_link_transfer;
+            no_multicast_ = nest->no_multicast;
+            no_temporal_reuse_ = nest->no_temporal_reuse;
+
+            // Construct nest_state_.
+            int level = nest->loops.size();
+            for (auto iter = nest->loops.rbegin(); iter != nest->loops.rend(); ++iter)
+            {
+                auto& descriptor = *iter;
+                analysis::LoopState cur;
+                cur.level = --level;
+                cur.descriptor = descriptor;
+                nest_state_.push_back(cur);    
+            }
+
+            num_epochs_ = input_.num_epochs_;
         }
 
-        void PerfectLoopnestAnalyzer::calculateDataMovement()
+        RetVal PerfectLoopnestAnalyzer::calculateDataMovement()
         {
+            auto node = input_.curr_node_;
+            assert(node->get_type() == Node::type_t::Tile);
+            auto tile_node = static_cast<const TileNode *>(node);
+            RetVal ret_val;
             if (nest_state_.size() != 0)
             {
                 InitializeNestProperties();
                 InitializeLiveState();
                 DetectImperfectFactorization();
-
-                // Recursive call starting from the last element of the list.
-                dm.deltas_.push(NestAnalysis::ComputeDeltas(nest_state_.rbegin()));
-                CollectWorkingSets();
+                std::cout << "PerfectLoopnestAnalyzer::calculateDataMovement:" << std::endl;
+                for (auto iter = nest_state_.rbegin(); iter!= nest_state_.rend(); iter++) {
+                    std::cout << problem::GetShape()->FlattenedDimensionIDToName.at(iter->descriptor.dimension) << ":";
+                    std::cout << iter->descriptor.start << "," << iter->descriptor.end << "," << iter->descriptor.stride << ",";
+                    std::cout << vector_strides_[iter->level];
+                    std::cout << std::endl;
+                }
+                if (!tile_node->is_spatial())
+                {
+                    ret_val = ComputeTemporalWorkingSet();
+                }
+                else
+                {
+                    ret_val = ComputeSpatialWorkingSet();
+                }
             }
-
             // Done.
             working_sets_computed_ = true;
-        }
 
-        void PerfectLoopnestAnalyzer::ComputeTemporalWorkingSet(
-            std::vector<analysis::LoopState>::reverse_iterator cur,
-            analysis::ElementState &cur_state)
-        {
-            // We do two things in this function: (a) calculate the size of the temporal
-            // working set for this level, and (b) calculate the number of accesses to
-            // this level from the inner level.
-            //
-            // We used to do both these tasks by accumulating the deltas returned by
-            // recursive calls to inner nesting levels. That was problematic for task (a)
-            // because inner levels can sometimes buffer data across iterations of *this*
-            // level, which sometimes causes the union of the deltas propagated to this
-            // level to form a fractured polyhedral space. Note that this fracturing is
-            // fine in terms of calculating *accesses* to this level (b), since it
-            // reflects filtering.
-            //
-            // To address this, we first attempted to restrict gradient direction changes
-            // during delta computation. However, this only captures a subset of scenarios.
-            // It also affects (b), but that is fine because most hardware pattern
-            // generators are probably going to be unable to generate patterns that can
-            // keep state alive through gradient direction changes.
-            //
-            // The solution we are now adopting is to use delta accumulation only for (b)
-            // and to use an alternative tactic for (a). For certain problem shapes (such
-            // as CNN's axis-aligned hyper-rectangles), we can trivially calculate working
-            // sets by considering only the corner points in the problem sub-space walked
-            // by the subnest starting from this level down. We assume that loops are
-            // always ascending (FIXME: check for this during loop construction).
-
-            int level = cur->level;
-
-            bool at_boundary = level == 0;
-
-            bool dump = false; // (level >= 4);
-
-            int end = IsLastGlobalIteration_(level + 1, cur->descriptor.dimension) ? cur->descriptor.residual_end : cur->descriptor.end;
-
-            // First, update loop gist. FIXME: handle base!=0, stride!=1.
-            ASSERT(cur->descriptor.start == 0);
-            ASSERT(cur->descriptor.stride == 1);
-            loop_gists_temporal_[cur->descriptor.dimension] = {0, end};
-
-            //
-            // Step II: Compute Accesses by accumulating deltas returned by inner levels.
-            //
-
-            std::uint64_t num_iterations = 1 + ((end - 1 - cur->descriptor.start) /
-                                                cur->descriptor.stride);
-
-            std::vector<problem::PerDataSpace<std::size_t>> temporal_delta_sizes;
-            std::vector<std::uint64_t> temporal_delta_scale;
-
-            bool run_last_iteration = imperfectly_factorized_ || problem::GetShape()->UsesFlattening;
-            bool run_second_last_iteration = imperfectly_factorized_ && run_last_iteration;
-
-            if (analysis::TileFlow::gExtrapolateUniformTemporal && !disable_temporal_extrapolation_.at(level))
-            {
-                // What we would like to do is to *NOT* iterate through the entire loop
-                // for this level, but instead fire iterations #0, #1 and #last, and
-                // extrapolate the remainder based on the result of iteration #1.
-
-                // Iteration #last is only required for accurate partition size tracking.
-                // Otherwise, we reset the point set on any gradient change, and so
-                // tracking the point set for the #last iteration is not needed.
-
-                // Note that this entire approach will break if there is any irregularity
-                // in working-set movement along the loop (e.g., a modulus in the index
-                // expression).
-
-                int dim = int(cur->descriptor.dimension);
-                int scale = vector_strides_[level][dim];
-                auto saved_transform = cur_transform_[dim];
-
-                // Iteration #0.
-                indices_[level] = cur->descriptor.start;
-                loop_gists_temporal_.at(dim).index = indices_[level];
-
-                if (num_iterations >= 1)
-                {
-                    // Invoke next (inner) loop level.
-                    ++cur;
-                    auto temporal_delta = ComputeDeltas(cur, at_boundary);
-                    --cur;
-
-                    temporal_delta_sizes.push_back(temporal_delta.GetSizes());
-                    temporal_delta_scale.push_back(1);
-                    cur_transform_[dim] += scale;
-
-                    indices_[level] += cur->descriptor.stride;
-                    loop_gists_temporal_.at(dim).index = indices_[level];
-
-                    if (at_boundary)
-                        time_stamp_.back()++;
-                }
-
-                // Iterations #1 through #last-1/last.
-                if ((run_second_last_iteration && num_iterations >= 4) ||
-                    (run_last_iteration && !run_second_last_iteration && num_iterations >= 3) ||
-                    (!run_last_iteration && num_iterations >= 2))
-                {
-                    // Invoke next (inner) loop level, scaling up the number of epochs
-                    // by the number of virtual iterations we want to simulate.
-                    std::uint64_t virtual_iterations =
-                        run_last_iteration ? num_iterations - 2 : num_iterations - 1;
-
-                    // Run one fewer iteration for imperfect factor support
-                    if (run_second_last_iteration)
-                        virtual_iterations = virtual_iterations - 1;
-
-                    auto saved_epochs = num_epochs_;
-                    num_epochs_ *= virtual_iterations;
-
-                    ++cur;
-                    auto temporal_delta = ComputeDeltas(cur, at_boundary);
-                    --cur;
-
-                    num_epochs_ = saved_epochs;
-
-                    temporal_delta_sizes.push_back(temporal_delta.GetSizes());
-                    temporal_delta_scale.push_back(virtual_iterations);
-
-                    cur_transform_[dim] += (scale * virtual_iterations);
-
-                    indices_[level] += (cur->descriptor.stride * virtual_iterations);
-                    loop_gists_temporal_.at(dim).index = indices_[level];
-
-                    if (at_boundary)
-                        time_stamp_.back() += virtual_iterations;
-                }
-
-                // Iteration # second last to find delta for imperfect factors
-                if (run_second_last_iteration && num_iterations >= 3)
-                {
-                    // Invoke next (inner) loop level.
-                    ++cur;
-                    auto temporal_delta = ComputeDeltas(cur, at_boundary);
-                    --cur;
-
-                    if (num_iterations >= 4)
-                    {
-                        temporal_delta_scale.back()++;
-                    }
-                    else
-                    {
-                        temporal_delta_sizes.push_back(temporal_delta.GetSizes());
-                        temporal_delta_scale.push_back(1);
-                    }
-
-                    cur_transform_[dim] += scale;
-
-                    indices_[level] += cur->descriptor.stride;
-                    loop_gists_temporal_.at(dim).index = indices_[level];
-
-                    if (at_boundary)
-                        time_stamp_.back()++;
-                }
-
-                // Iteration #last.
-                if (run_last_iteration && num_iterations >= 2)
-                {
-                    // Invoke next (inner) loop level.
-                    ++cur;
-                    auto temporal_delta = ComputeDeltas(cur, at_boundary);
-                    --cur;
-
-                    // If we ran the virtual-iteration logic above, we shouldn't actually
-                    // use this returned delta, because we will receive the delta between
-                    // iteration #2 and #last. Instead, we just re-use the last delta by
-                    // increasing the #virtual iterations (scale) by 1.
-                    if (!run_second_last_iteration && num_iterations >= 3)
-                    {
-                        temporal_delta_scale.back()++;
-                    }
-                    else
-                    {
-                        temporal_delta_sizes.push_back(temporal_delta.GetSizes());
-                        temporal_delta_scale.push_back(1);
-                        cur_transform_[dim] += scale;
-                    }
-
-                    indices_[level] += cur->descriptor.stride;
-                    loop_gists_temporal_.at(dim).index = indices_[level];
-
-                    if (at_boundary)
-                        (time_stamp_.back())++;
-                }
-
-                cur_transform_[dim] = saved_transform;
-            }
-            else // not analysis::TileFlow::gExtrapolateUniformTemporal
-            {
-                int dim = int(cur->descriptor.dimension);
-                int scale = vector_strides_[level][dim];
-
-                auto saved_transform = cur_transform_[dim];
-
-                for (indices_[level] = cur->descriptor.start;
-                     indices_[level] < end;
-                     indices_[level] += cur->descriptor.stride)
-                {
-                    loop_gists_temporal_.at(dim).index = indices_[level];
-
-                    // Invoke next (inner) loop level.
-                    ++cur;
-                    auto temporal_delta = ComputeDeltas(cur, at_boundary);
-                    --cur;
-
-                    temporal_delta_sizes.push_back(temporal_delta.GetSizes());
-                    temporal_delta_scale.push_back(1);
-
-                    cur_transform_[dim] += scale;
-
-                    if (at_boundary)
-                        (time_stamp_.back())++;
-                }
-
-                cur_transform_[dim] = saved_transform;
-            } // analysis::TileFlow::gExtrapolateUniformTemporal
-
-            if (dump)
-            {
-                std::cout << "-------\n";
-                std::cout << "LEVEL " << level << std::endl;
-                std::cout << "-------\n";
-            }
-
-            if (at_boundary)
-            {
-                // Track accesses for only those levels that are relevant
-                // in the final analysis after CollapseTiles.
-                problem::PerDataSpace<std::size_t> final_delta_sizes;
-                final_delta_sizes.fill(0);
-
-                auto num_deltas = temporal_delta_sizes.size();
-                for (unsigned i = 0; i < num_deltas; i++)
-                {
-                    for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
-                    {
-                        final_delta_sizes[pv] += (temporal_delta_sizes[i][pv] * temporal_delta_scale[i]);
-                    }
-                }
-
-                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
-                {
-                    // Set scatter factor (otherwise it will stay at 0 for temporal levels).
-                    std::uint64_t scatter_factor = 1;
-                    std::uint64_t multicast_factor = 1;
-
-                    auto &access_stats = cur_state.access_stats[pv](multicast_factor, scatter_factor);
-                    access_stats.accesses += final_delta_sizes[pv] * num_epochs_;
-
-                    // Set cumulative hops for temporal levels.
-                    access_stats.hops = 0.0;
-
-                    // Update delta histogram. Hypothesis is we only need to do this for temporal levels.
-                    cur_state.delta_histograms[pv][final_delta_sizes[pv]] += num_epochs_;
-
-                } // for (datatype)
-            }     // storage boundary
-        }
-
-        problem::OperationSpace PerfectLoopnestAnalyzer::ComputeDeltas(
-            std::vector<analysis::LoopState>::reverse_iterator cur,
-            bool at_boundary)
-        {
-            if (!at_boundary)
-            {
-                return analysis::NestAnalysis::ComputeDeltas(cur);
-            }
-            ScreenShot screen_shot;
-            screen_shot.num_epochs_ = num_epochs_;
-            screen_shot.time_stamp_ = time_stamp_;
-            screen_shot.space_stamp_ = space_stamp_;
-            screen_shot.cur_transform_ = cur_transform_;
-            screen_shot.node = dm.screen_shot_.node->get_children().front();
-            return dm.computeDelta(screen_shot);
+            return ret_val;
         }
 
         void DimScaleCalculator::visitOp(const OpNode *)
@@ -606,7 +443,7 @@ namespace analysis
 
         void DimScaleCalculator::visitScope(const ScopeNode *node)
         {
-            std::vector<std::uint64_t> cur_scale;
+            std::vector<std::uint64_t> cur_scale(n_dim, 1);
             for (auto child : node->get_children())
             {
                 child->accept(this);
@@ -653,7 +490,7 @@ namespace analysis
 
         void PerfectLoopnestAnalyzer::InitPerLevelDimScales()
         {
-            auto &config = dm.analysis_.configs[dm.screen_shot_.node];
+            auto &config = dm_.analysis_.configs[input_.curr_node_];
             vector_strides_ = config.vector_strides_;
             // std::cout << "vector_strides_:" << std::endl;
             // for (auto& vector_stride: vector_strides_) {
@@ -662,7 +499,7 @@ namespace analysis
             mold_low_ = config.mold_low_;
             mold_high_ = config.mold_high_;
             mold_high_residual_ = config.mold_high_residual_;
-            cur_transform_ = dm.screen_shot_.cur_transform_;
+            cur_transform_ = input_.cur_transform_;
             // std::cout << "curr_transform_:";
             // cur_transform_.Print(std::cout) << std::endl;
         }
@@ -672,8 +509,8 @@ namespace analysis
             storage_boundary_level_.resize(nest_state_.size(), false);
             arch_storage_level_.resize(nest_state_.size());
             disable_temporal_extrapolation_.resize(nest_state_.size(), false);
-            
-            unsigned storage_level = static_cast<const TileNode*>(dm.screen_shot_.node)->get_storage_level();
+
+            unsigned storage_level = static_cast<const TileNode *>(input_.curr_node_)->get_storage_level();
             unsigned loop_level = 0;
             // std::cout << "nest_state_.size(): " << nest_state_.size();
             // std::cout << "storage_tiling_boundaries_: ";
@@ -719,6 +556,354 @@ namespace analysis
 
                 storage_level++;
             }
+        }
+
+        RetVal PerfectLoopnestAnalyzer::ComputeTemporalWorkingSet()
+        {
+            // 1. recursive call to simulate the runnning;
+            if (input_.num_epochs_)
+                SimulateTemporalExecution();
+            // 2. Get current working set
+            problem::OperationSpace point_set = GetCurrentWorkingSet(nest_state_.rbegin());
+            // auto sizes = point_set.GetSizes();
+            // auto &cur_state = config_.state_;
+            // std::transform(sizes.begin(), sizes.end(),
+            //                cur_state.max_size.begin(), cur_state.max_size.begin(),
+            //                [](std::size_t x, std::size_t y)
+            //                { return std::max(x, y); });
+            // TODO: add optional temporal reuse here
+
+            // We need to musk out the unused tensor from the point_set
+            auto & active_tensors = config_.active_tensors;
+            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++) {
+                if (find(active_tensors.begin(), active_tensors.end(), pv) == active_tensors.end()) 
+                    point_set.GetDataSpace(pv).Reset();
+            }
+
+            RetVal ret;
+            problem::OperationSpace delta(workload_);
+            if (input_.init_working_set_.getDataSpaces().count(0))
+                ret.deltas_[0] = point_set - input_.init_working_set_.at(0);
+            else ret.deltas_[0] = point_set;
+            ret.last_working_set_[0] = point_set;
+            return ret;
+        }
+
+        void PerfectLoopnestAnalyzer::SimulateTemporalExecution()
+        {
+            std::vector<int> dims;
+            std::vector<int> scales;
+            std::vector<int> loop_counts = {};
+            std::vector<int> trip_counts = {1};
+            for (auto iter = nest_state_.rbegin(); iter != nest_state_.rend(); ++iter) {
+                dims.push_back(iter->descriptor.dimension);
+                scales.push_back(vector_strides_[iter->level][dims.back()]);
+                loop_counts.push_back((iter->descriptor.end - iter->descriptor.start)
+                    / iter->descriptor.stride);
+                trip_counts.push_back(trip_counts.back() * loop_counts.back());
+            }
+            std::cout << "dims:";
+            for (int i = 0; i < (int)nest_state_.size(); ++i) {
+                std::cout << dims[i];
+            }
+            std::cout << std::endl;
+            
+            // the init
+            {
+                InputParam input = input_;
+                input.num_epochs_ = 1;
+                input.curr_node_ = input_.curr_node_->get_children().front();
+                auto ret_val = dm_.computeDelta(input);
+                for (auto &kv : ret_val.deltas_.getDataSpaces()){
+                    for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++){
+                        config_.access_stats_[pv](1, 1).accesses += input.num_epochs_ * kv.second.GetSize(pv);
+                    }
+                }
+            }
+
+            for (int i = 0; i < (int)nest_state_.size(); ++i) {
+                if (loop_counts[i] <= 1) continue;
+                InputParam input = input_;
+                input.curr_node_ = input_.curr_node_->get_children().front();
+                input.num_epochs_ = 0;
+                for (int j = i+1; j < nest_state_.size(); ++j) {
+                    input.cur_transform_[dims[j]] += scales[j] * (loop_counts[j] - 1);
+                }
+                RetVal ret_val = dm_.computeDelta(input); 
+                auto last_index = input.cur_transform_;
+                
+                input.init_working_set_ = ret_val.last_working_set_;
+                input.num_epochs_ = num_epochs_ * (trip_counts[i+1] - trip_counts[i]);
+                input.cur_transform_ = input_.cur_transform_;
+                input.cur_transform_[dims[i]] += scales[i];
+                ret_val = dm_.computeDelta(input);  
+                std::cout << "--------------" << std::endl;
+                std::cout << "last_index:" << last_index << std::endl;
+                std::cout << input;
+                std::cout << ret_val; 
+                std::cout << "--------------" << std::endl;
+                for (auto &kv : ret_val.deltas_.getDataSpaces()){
+                    for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++){
+                        config_.access_stats_[pv](1, 1).accesses += input.num_epochs_ * kv.second.GetSize(pv);
+                    }
+                }
+            }
+        }
+
+        RetVal PerfectLoopnestAnalyzer::ComputeSpatialWorkingSet()
+        {
+            // Only second step: compute the spatial deltas;
+            RetVal ret;
+            FillSpatialDeltas(nest_state_.rbegin(), 
+                              0,                     // base_index,
+                              0,                     // extrapolation_stride
+                              nest_state_.rbegin(), // extrapolation_level 
+                              ret);  // the ret val
+            return ret;
+        }
+
+        problem::PerDataSpace<Point> PerfectLoopnestAnalyzer::GetCurrentTranslationVectors(
+            std::vector<analysis::LoopState>::reverse_iterator cur) {
+            problem::PerDataSpace<Point> translation_vectors;
+            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++) {
+                unsigned order = problem::GetShape()->DataSpaceOrder.at(pv);
+                auto& point = translation_vectors[pv] = Point(order);
+                for (unsigned dim = 0; dim < order; dim++) {
+                    point[dim] = 0;
+                    for (auto& term: problem::GetShape()->Projections.at(pv).at(dim)){
+                        if (term.second == cur->descriptor.dimension) {
+                            point[dim] += cur->descriptor.stride 
+                                * vector_strides_[cur->level][cur->descriptor.dimension];
+                        }
+                    }
+                }
+
+            }
+            return translation_vectors;
+        }
+
+        void PerfectLoopnestAnalyzer::FillSpatialDeltas(std::vector<analysis::LoopState>::reverse_iterator cur,
+                                                        std::uint64_t base_index,
+                                                        int extrapolation_stride,
+                                                        std::vector<analysis::LoopState>::reverse_iterator extrapolation_level,
+                                                        RetVal& ret)
+        {
+            if (cur == nest_state_.rend()) {
+                if (extrapolation_stride == 0) {
+                    std::uint64_t spatial_id = SpatialIDL2P(base_index);
+                    InputParam input = input_;
+                    input.curr_node_ = input_.curr_node_->get_children().front();
+                    input.space_stamp_.push_back(spatial_id); 
+                    input.cur_transform_ = cur_transform_;
+                    input.init_working_set_ = 
+                        MemoryState(0, input.init_working_set_[spatial_id]);
+                    RetVal ret_ = dm_.computeDelta(input);
+                    ret.deltas_.insert(spatial_id, ret_.deltas_[0]);
+                    ret.last_working_set_.insert(spatial_id, ret_.last_working_set_[0]);
+                }
+                else {
+                    auto translation_vectors = GetCurrentTranslationVectors(extrapolation_level);
+                    std::uint64_t dst_delta_index = SpatialIDL2P(base_index);
+                    std::uint64_t src_delta_index = SpatialIDL2P(base_index - extrapolation_stride);
+                    
+                    auto& dst_temporal_delta = ret.deltas_[dst_delta_index];
+                    auto& src_temporal_delta = ret.deltas_[src_delta_index];
+                    auto& dst_last_working_set = ret.last_working_set_[dst_delta_index];
+                    auto& src_last_working_set = ret.last_working_set_[src_delta_index];
+                    for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
+                    {
+                        dst_temporal_delta.GetDataSpace(pv) = src_temporal_delta.GetDataSpace(pv);
+                        dst_temporal_delta.GetDataSpace(pv).Translate(translation_vectors.at(pv));
+                        dst_last_working_set.GetDataSpace(pv) = src_last_working_set.GetDataSpace(pv);
+                        dst_last_working_set.GetDataSpace(pv).Translate(translation_vectors.at(pv));
+                    }
+                }
+                return; 
+            } 
+
+            int level = cur->level;
+            auto dim = cur->descriptor.dimension;
+
+            int end = IsLastGlobalIteration_(level + 1, cur->descriptor.dimension) ? cur->descriptor.residual_end : cur->descriptor.end;
+
+            unsigned num_iterations = 1 + ((end - 1 - cur->descriptor.start) /
+                                           cur->descriptor.stride);
+
+            // First, update loop gist. FIXME: handle base!=0, stride!=1.
+            ASSERT(cur->descriptor.start == 0);
+            ASSERT(cur->descriptor.stride == 1);
+
+            base_index *= end;
+
+            int iterations_run = 0;
+            int iterations_to_run = 1;
+            int scale = vector_strides_[level][dim];
+
+            for (indices_[level] = cur->descriptor.start;
+                indices_[level] < end;
+                indices_[level] += cur->descriptor.stride, iterations_run++)
+            {                
+                auto next_extrapolation_stride = extrapolation_stride * num_iterations; // * num_iterations?
+                auto next_extrapolation_level = extrapolation_level;
+                if (iterations_run >= iterations_to_run) // Extrapolate using this level
+                {
+                    next_extrapolation_stride = cur->descriptor.stride;
+                    next_extrapolation_level = cur;
+                }
+
+                ++cur;
+
+                FillSpatialDeltas(cur, 
+                                base_index + indices_[level],
+                                next_extrapolation_stride,
+                                next_extrapolation_level, 
+                                ret);
+
+                --cur;
+                cur_transform_[dim] += scale;
+            }
+        }
+
+        std::uint64_t PerfectLoopnestAnalyzer::SpatialIDL2P(std::uint64_t logical_id) {
+            return ((logical_id % config_.logical_y) + config_.spatial_offset_y) +
+                ((logical_id / config_.logical_y) + config_.spatial_offset_x) * config_.fanout_y;
+        }
+
+        void StorageLevelCalculator::visitScope(const ScopeNode* node) {
+            auto& config = analysis_.configs[node];
+            auto& storage_level = config.storage_level = -1;
+            for (auto child: node->get_children()) {
+                child->accept(this);
+                assert(!storage_levels_.empty());
+                if (storage_level == (unsigned)-1) {
+                    storage_level = storage_levels_.top();
+                }
+                else assert(storage_level == storage_levels_.top());
+                storage_levels_.pop();
+            }
+            config.fanout_x = analysis_.mapping_.fanoutX_map[config.storage_level];
+            config.fanout_y = analysis_.mapping_.fanoutY_map[config.storage_level];
+            storage_levels_.push(storage_level);
+        }
+
+        void StorageLevelCalculator::visitTile(const TileNode* node) {
+            for (auto child: node->get_children()) child->accept(this);
+            auto& config = analysis_.configs[node];
+            config.storage_level = node->get_storage_level();
+            if (node->is_spatial()) {
+                config.fanout_x = analysis_.mapping_.fanoutX_map[config.storage_level];
+                config.fanout_y = analysis_.mapping_.fanoutY_map[config.storage_level];
+            }
+            else config.fanout_x = config.fanout_y = 1;
+            storage_levels_.push(config.storage_level);
+        }
+
+        SpatialOffsetsCalculator::offset_t SpatialOffsetsCalculator::merge(
+            const SpatialOffsetsCalculator::offset_t& o1,
+            const SpatialOffsetsCalculator::offset_t& o2
+        ) {
+            return {std::max(o1.x, o2.x), std::max(o1.y, o2.y), std::max(o1.max_x, o2.max_x)};
+        }
+
+        void SpatialOffsetsCalculator::visitScope(const ScopeNode* node) {
+            auto type = node->get_scope_type();
+            offset_t init_offset = {0,0,0};
+            if (!input_offsets.empty()) {
+                init_offset = input_offsets.top();
+                input_offsets.pop();
+            }
+            offset_t output_offset = init_offset;
+            if (type == ScopeNode::Sequential || type == ScopeNode::Sharing) {
+                input_offsets.push(init_offset);
+                for (auto child: node->get_children()) {
+                    child->accept(this);
+                    assert(!output_offsets.empty());
+                    init_offset = output_offsets.top();
+                    output_offsets.pop();
+                }
+                output_offset = init_offset;
+            }
+            else {
+                for (auto child: node->get_children()) {
+                    input_offsets.push(init_offset);
+                    child->accept(this);
+                    assert(!output_offsets.empty());
+                    output_offset = merge(output_offset, output_offsets.top());
+                    output_offsets.pop();
+                }
+            }
+            output_offsets.push(output_offset);
+        } 
+
+        void SpatialOffsetsCalculator::visitTile(const TileNode* node) {
+            offset_t init_offset = {0,0,0};
+            if (!input_offsets.empty()) {
+                init_offset = input_offsets.top();
+                input_offsets.pop();
+            }
+            for (auto child: node->get_children()) {
+                child->accept(this);
+            }
+            auto& config = analysis_.configs[node];
+            config.logical_x = config.logical_y = 1;
+            if (node->is_spatial()) {
+                for (auto loop: node->get_loops()) {
+                    int loop_count = 
+                        (loop.end - loop.start) / loop.stride;
+                    if (loop::IsSpatialX(loop.spacetime_dimension)) {
+                        config.logical_x *= loop_count;
+                    }
+                    else config.logical_y *= loop_count;
+                }
+            }
+            offset_t output_offset = init_offset;
+            if (init_offset.y + config.logical_y <= config.fanout_y) {
+                config.spatial_offset_x = init_offset.x;
+                config.spatial_offset_y = init_offset.y;
+                output_offset.y += config.logical_y;
+                output_offset.max_x = std::max(output_offset.max_x, 
+                    output_offset.x + (unsigned)config.logical_x);
+            }
+            else {
+                config.spatial_offset_x = output_offset.max_x;
+                config.spatial_offset_y = 0;
+                output_offset.x = output_offset.max_x;
+                output_offset.y = config.logical_y;
+                output_offset.max_x = output_offset.x + config.logical_x; 
+            }
+            assert(output_offset.y <= config.fanout_y);
+            assert(output_offset.max_x <= config.fanout_x);
+            output_offsets.push(output_offset);
+            // how much resources are used. 
+        }
+
+        std::ostream& operator<< (
+            std::ostream& o, 
+            const InputParam& input){
+            o << "Input:" << std::endl;
+            o << "n_epoch:" << input.num_epochs_ << std::endl;
+            o << "t-stamp: ";
+            for (auto x:input.time_stamp_) o << x << ",";
+            o << std::endl;
+            o << "s-stamp: ";
+            for (auto x:input.space_stamp_) o << x << ",";
+            o << std::endl;
+            o << "point:" << input.cur_transform_ << std::endl;
+            o << "init state:" << std::endl;
+            input.init_working_set_.show();
+            return o;
+        }
+
+        std::ostream& operator<< (
+            std::ostream& o,
+            const RetVal& ret
+        ) {
+            o << "Ret:" << std::endl;
+            o << "Delats:";
+            ret.deltas_.show();
+            o << "LastWorkingSet:" << std::endl;
+            ret.last_working_set_.show();
+            return o; 
         }
 
     } // namespace TileFlow

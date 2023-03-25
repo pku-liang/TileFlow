@@ -1,0 +1,25 @@
+mapping:
+  node-type: Tile 
+  type: temporal 
+  factors: K=8
+  permutation: K 
+  target: MainMemory 
+  
+  subtree: 
+  - node-type: Tile 
+    type: Spatial 
+    factors: K=16
+    permutation: K 
+    target: MainMemory
+
+    subtree: 
+    - node-type: Tile 
+      type: temporal  
+      factors: R=3
+      permutation: R 
+      target: RegFile
+      
+      subtree:
+      - node-type: Op
+        name: Conv1D 
+        binding: K:K R:R
