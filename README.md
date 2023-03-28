@@ -22,12 +22,11 @@ cd timeloop
 ln -s ../pat-public/src/pat .
 cd ..
 scons --accelergy -j4 --static [--d] # --d for debug build
-cp -r ./lib/ $TILEFLOW_BASE/lib
+cp ./lib/* $TILEFLOW_BASE/lib
 
 cd $TILEFLOW_BASE
-# build frontend parser 
-scons --accelergy -j4 --static --parser [--d]
-# build tileflow: error now 
+
+# build tileflow 
 scons --accelergy -j4 --static [--d] 
 
 # add bin to path 
@@ -39,5 +38,5 @@ source ./setup-env.sh
 ```bash 
 # test parser 
 cd ./tests/cases/08-test-2mm # a sample input for 2mm.
-parser arch/* prob/* map/* 
+tileflow arch/* prob/* map/* 
 ```

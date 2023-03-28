@@ -1,30 +1,3 @@
-/* Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 #include <iostream>
 #include <csignal>
 #include <cstring>
@@ -33,24 +6,12 @@
 #include "compound-config/compound-config.hpp"
 #include "util/args.hpp"
 
-extern bool gTerminateEval;
+#include "tileflow/problem/problem.hpp"
+#include "tileflow/mapping/mapping.hpp"
+#include "tileflow/loop-analysis/nest-analysis.hpp"
+#include "tileflow/model/topology.hpp"
 
-void handler(int s)
-{
-  if (!gTerminateEval)
-  {
-    std::cerr << "First " << strsignal(s) << " caught. Abandoning "
-              << "ongoing evaluation and terminating immediately."
-              << std::endl;
-    gTerminateEval = true;
-  }
-  else
-  {
-    std::cerr << "Second " << strsignal(s) << " caught. Existing disgracefully."
-              << std::endl;
-    exit(0);
-  }
-}
+extern bool gTerminateEval;
 
 //--------------------------------------------//
 //                    MAIN                    //
@@ -60,12 +21,6 @@ int main(int argc, char* argv[])
 {
   assert(argc >= 2);
 
-  struct sigaction action;
-  action.sa_handler = handler;
-  sigemptyset(&action.sa_mask);
-  action.sa_flags = 0;
-  sigaction(SIGINT, &action, NULL);
-  
   std::vector<std::string> input_files;
   std::string output_dir = ".";
   bool success = ParseArgs(argc, argv, input_files, output_dir);
@@ -77,9 +32,52 @@ int main(int argc, char* argv[])
 
   auto config = new config::CompoundConfig(input_files);
 
-  Application application(config, output_dir);
+  auto root = config->getRoot();
   
-  application.Run();
+  auto problem = root.lookup("problem");
+  problem::TileFlow::Workloads workloads;
+  
+
+  config::CompoundConfigNode arch;
+
+  if (root.exists("arch"))
+  {
+    arch = root.lookup("arch");
+  }
+  else if (root.exists("architecture"))
+  {
+    arch = root.lookup("architecture");
+  }
+  
+  bool is_sparse_topology = root.exists("sparse_optimizations");
+
+  model::Engine::Specs arch_specs_ = model::Engine::ParseSpecs(arch, is_sparse_topology);
+
+  std::cout << "Begin ParseWorkload..." << std::endl;
+  problem::TileFlow::ParseWorkloads(problem, workloads);
+
+  auto mapping = mapping::TileFlow::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
+  
+  mapping.Print();
+  
+  workloads.Print();
+
+  problem::Workload::SetCurrShape(&workloads.get_shape());
+
+  model::TileFlow::Topology topology_;
+
+  std::cout << "Begin Spec..." << std::endl; 
+  topology_.Spec(arch_specs_.topology);
+
+  analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_);
+  analysis.analyze();
+  analysis.Print();
+
+  std::cout << "Begin eval..." << std::endl; 
+
+  topology_.eval(mapping, analysis);
+
+  std::cout << "Parser check passed!" << std::endl;
 
   return 0;
 }

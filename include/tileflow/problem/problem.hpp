@@ -35,27 +35,35 @@ namespace TileFlow {
         std::unordered_map<std::string, std::shared_ptr<problem::TileFlow::Workload> > workloads_;
         std::vector<std::string> ins_;
         std::vector<std::string> outs_;
-        problem::Shape common_shape_;
-        Workload::FactorizedBounds factorized_bounds;
         config::CompoundConfigNode coeffs_;
 
+        problem::Workload::FactorizedBounds factorized_bounds_;
+        problem::Workload::FlattenedBounds flattened_bounds_;
+        problem::Workload::Coefficients coefficients_;
+        problem::Workload::Densities densities_;
+        problem::Shape common_shape_;
+
+        mutable problem::Workload workload_;
+        mutable bool workload_constructed_ = false;
+
     public:
-        Workloads() {common_shape_.UsesFlattening = false;}
+        Workloads() {common_shape_.UsesFlattening = false; coefficients_[-1] = 1;}
         bool add_workload(const std::string& name, std::shared_ptr<problem::TileFlow::Workload>& workload);
         std::shared_ptr<problem::TileFlow::Workload> get_workload(const std::string & op_name) const {
             return workloads_.at(op_name);
         }
         void set_io(const std::vector<std::string>& ins, const std::vector<std::string>& outs);
+        void set_coeffs(const config::CompoundConfigNode& coeffs);
+        void set_factorized_bound(const std::string& dim, int bound);
+
+        void Print();
+        
         const std::vector<std::string>& get_ins() const {return ins_;}
         const std::vector<std::string>& get_outs() const {return outs_;}
-        void set_coeff(const config::CompoundConfigNode& coeffs) {coeffs_ = coeffs;}
-        int lookup_coeff(const std::string& name) const {int value = 1; coeffs_.lookupValue(name, value); return value;}
-        void Print();
-        const problem::Shape& get_shape() {return common_shape_;}
-        void set_factorized_bound(const std::string& dim, int bound);
-        const Workload::FactorizedBounds& get_factorized_bound() {return factorized_bounds;}
+        const problem::Workload& get_workload() const;
+        const problem::Shape& get_shape() const {return common_shape_;}
+
         friend class Workload;
-        
     };
 
     void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads_);

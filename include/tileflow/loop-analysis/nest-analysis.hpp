@@ -22,32 +22,43 @@ namespace analysis {
 
 namespace TileFlow {
 
+    struct stat_t {
+        problem::PerDataSpace<AccessStatMatrix> access_stat_;
+        problem::PerDataSpace<size_t> max_size_;
+        problem::PerDataSpace<long> link_transfer_;
+        ComputeInfo compute_info_;
+    };
+
     struct NodeConfig {
         // problem::Workload workload;
-        std::vector<problem::Shape::DataSpaceID> active_tensors;
+        // tensors cause transfer by read (to lower level)
+        std::vector<problem::Shape::DataSpaceID> active_read_tensors;
+        // tensor that cause transfer by fill (to upper level)
+        std::vector<problem::Shape::DataSpaceID> active_fill_tensors;
         loop::Nest loop_nest;
         std::vector<problem::OperationPoint> vector_strides_;
         std::vector<problem::OperationPoint> mold_low_;
         std::vector<problem::OperationPoint> mold_high_;
         std::vector<problem::OperationPoint> mold_high_residual_;
         // the state to record the last_point_set and access counting 
-        problem::PerDataSpace<AccessStatMatrix> access_stats_;
+
+        std::map<std::vector<unsigned>, stat_t> stats_;
 
         // StorageLevelCalculator
         unsigned storage_level;
         std::uint64_t fanout_x, fanout_y;
 
         // SpatialOffsetsCalculator
-        std::uint64_t spatial_offset_x, spatial_offset_y, logical_x, logical_y;
-
-        std::unordered_map<problem::Shape::DataSpaceID, 
-            std::vector<analysis::DataMovementInfo> > data_movements;
+        std::uint64_t spatial_offset_x, spatial_offset_y, logical_x, logical_y, logical_fanout;
+        std::uint64_t replication_factor;
     };
 
     class NestAnalysis {
-        problem::TileFlow::Workloads& workloads_;
-        mapping::TileFlow::Mapping& mapping_;
-        model::Engine::Specs& arch_specs_;
+        const problem::TileFlow::Workloads& workloads_;
+        const mapping::TileFlow::Mapping& mapping_;
+        const model::Engine::Specs& arch_specs_;
+
+        const problem::Workload& common_workload_;
         
         void add_access_pattern(
             problem::Shape::DataSpaceID producer_id, 
@@ -82,15 +93,29 @@ namespace TileFlow {
          */ 
         void get_spatial_offsets();
 
-        // this is set by get_datamovement
-        std::map<std::vector<unsigned>, ComputeInfo> compute_info_;
+        /**
+         * \brief Aggregate Datamovement/compute info
+        */
+        void collect_info();
+
+        std::unordered_map<const Node*, NodeConfig> configs;
+
+        // the interface
+        std::unordered_map<const Node*, tiling::CompoundTile> tiles_; 
+
     public: 
         NestAnalysis(problem::TileFlow::Workloads& workloads_, 
             mapping::TileFlow::Mapping& mapping_, 
-            model::Engine::Specs& arch_specs_)
-            : workloads_(workloads_), mapping_(mapping_), arch_specs_(arch_specs_){}
+            model::Engine::Specs& arch_specs_);
         
-        std::unordered_map<const Node*, NodeConfig> configs;
+        const tiling::CompoundTile& get_tile(const Node* node) const 
+            {
+                if (tiles_.count(node) == 0)    {
+                    std::cerr << "ERROR node not found:" << std::endl;
+                    node->display("", false);
+                }
+                return tiles_.at(node);
+            }
 
         void analyze();
         void Print();
@@ -98,7 +123,11 @@ namespace TileFlow {
         friend class DatamovementCalculator;
         friend class DimScaleCalculator;
         friend class LoopNestConstructor;
+        friend class PerfectLoopnestAnalyzer;
         friend class StorageLevelCalculator;
+        friend class SpatialOffsetsCalculator;
+        friend class ComputeAccess;
+        friend class ComputeExpansion;
     };
 
     /**
@@ -135,7 +164,7 @@ namespace TileFlow {
 
     class DatamovementCalculator: public mapping::TileFlow::Visitor {
         NestAnalysis& analysis_;
-        problem::Workload& workload_;
+        const problem::Workload& workload_;
         /**
          * \brief the stack to pass parameter between nodes.
         */
@@ -147,9 +176,10 @@ namespace TileFlow {
         void visitTile(const TileNode*) override;
         void visitScope(const ScopeNode*) override;
         void visitOp(const OpNode*) override;
+    
     public:
-        DatamovementCalculator(NestAnalysis& analysis, problem::Workload& workload): 
-            analysis_(analysis), workload_(workload){}
+        DatamovementCalculator(NestAnalysis& analysis): 
+            analysis_(analysis), workload_(analysis_.common_workload_){}
         void run(const Node*) override;
         friend class PerfectLoopnestAnalyzer;
     };
@@ -180,7 +210,7 @@ namespace TileFlow {
             DatamovementCalculator& dm,
             InputParam& input, 
             NodeConfig& config): dm_(dm), input_(input), config_(config){}
-        void init(problem::Workload*, loop::Nest*);
+        void init(const problem::Workload*, const loop::Nest*);
         RetVal calculateDataMovement();
         
         
@@ -191,6 +221,23 @@ namespace TileFlow {
         std::vector<const OpNode*> opnodes_;
     public: 
         std::vector<const OpNode*> collectOpNodes(Node*);
+    };
+    
+    class CollectTileNode: public mapping::TileFlow::Visitor {
+        void visitTile(const TileNode* node) override {
+            if (node->get_tile_type() == type_)
+                nodes_.push_back(node);
+            for (auto child: node->get_children())
+                child->accept(this);
+        }
+        std::vector<const TileNode*> nodes_;
+        TileNode::type_t type_;
+    public: 
+        CollectTileNode(TileNode::type_t type = TileNode::Temporal): type_(type){}
+        std::vector<const TileNode*> operator() (const Node*root){
+            root->accept(this);
+            return nodes_;
+        }
     };
 
     class Displayer: public mapping::TileFlow::Visitor {
@@ -246,14 +293,40 @@ namespace TileFlow {
             
         };
         offset_t merge(const offset_t& o1, const offset_t& o2);
+        int replication_factor = 1;
         std::stack<offset_t> input_offsets, output_offsets;
         void visitTile(const TileNode*) override;
         void visitScope(const ScopeNode*) override;
+        void visitOp(const OpNode*) override;
         NestAnalysis& analysis_;
     public: 
         SpatialOffsetsCalculator(NestAnalysis& analysis): analysis_(analysis){
         }
     };
+
+    class ComputeAccess: public mapping::TileFlow::Visitor {
+        void visitTile(const TileNode*) override;
+        void visitOp(const OpNode*) override;
+        NestAnalysis& analysis_;     
+        void ComputeParentShareAccess(const TileNode*);
+        void ComputePeerAccesses(const TileNode*);
+        void ComputeReadUpdateFill(const TileNode*);
+        void ComputeDensityModels(const TileNode*);
+        
+    public: 
+        ComputeAccess(NestAnalysis& analysis): analysis_(analysis) {}
+    };
+
+    class ComputeExpansion: public mapping::TileFlow::Visitor {
+        void visitTile(const TileNode*) override;
+        void visitOp(const OpNode*) override;
+        NestAnalysis& analysis_;
+        std::pair<int, int> expansion_;
+    public: 
+        ComputeExpansion(NestAnalysis& analysis): analysis_(analysis),
+        expansion_(1,1) {}
+    };
+
 } // namespace TileFlow 
 
 } // namespace analysis 

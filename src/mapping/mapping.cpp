@@ -25,7 +25,6 @@ void Visitor::run(const Node* root) {
 
 loop::Nest TileNode::constructLoopNest(
     const std::map<std::string, problem::Shape::FactorizedDimensionID> & name2id) const{
-    std::uint64_t storage_level = 0;
     loop::Nest loop_nest;
     uint64_t num_subnests_added = 0;
     for (auto loop: loopnests_)

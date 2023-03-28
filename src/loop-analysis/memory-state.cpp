@@ -14,6 +14,7 @@ namespace TileFlow {
                 data_spaces_.at(kv.first) += kv.second;
             }
         }
+        return *this;
     }
 
     MemoryState& MemoryState::Substract(const MemoryState& other){
@@ -21,6 +22,7 @@ namespace TileFlow {
             if (other.data_spaces_.count(kv.first))
                 kv.second = kv.second - other.data_spaces_.at(kv.first);
         }
+        return *this;
     }
 
     MemoryState& MemoryState::Add(const MemoryState& other){
@@ -32,9 +34,10 @@ namespace TileFlow {
                 data_spaces_.at(kv.first) += kv.second;
             }
         }
+        return *this;
     }
 
-    MemoryState& MemoryState::Intersect(const MemoryState& other){
+    MemoryState& MemoryState::Intersect(const MemoryState& ){
         // TODO: realize real intersection logic here.  
         return *this;
     }

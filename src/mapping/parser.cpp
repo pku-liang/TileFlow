@@ -37,10 +37,10 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
     config.lookupValue("type", type_s);
     tolower(type_s);    
     if (type_s.find("temp") != std::string::npos) {
-        type = Temporal;
+        type_ = Temporal;
     }
     else if (type_s.find("spatial") != std::string::npos) {
-        type = Spatial;
+        type_ = Spatial;
     }
     else {
         TILEFLOW_ERROR("Unknown Tile type" << type_s);
@@ -255,7 +255,7 @@ void ScopeNode::display(std::string prefix, bool recursive) const{
     }
 }
 
-void OpNode::display(std::string prefix, bool recursive) const {
+void OpNode::display(std::string prefix, bool) const {
     std::cout << prefix;
     p_workload->Print();
     std::cout << prefix << ", binding: "; 

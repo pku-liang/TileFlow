@@ -2,6 +2,12 @@ problem:
   io:
     ins: A, B, D
     outs: E
+  dimensions: [M,N,K,L]
+  instance:
+    M: 512
+    N: 64
+    K: 64
+    L: 512
 
   ops:
   - name: GEMM1
@@ -22,10 +28,6 @@ problem:
         - [[L]]
     ins: A, B
     out: C
-    instance: 
-      M: 128
-      L: 128
-      K: 128
    
   - name: EXP 
     dimensions: [M,L]
@@ -42,9 +44,6 @@ problem:
     ins: C
     out: exp
     inplace: True
-    instance: 
-      M: 128
-      L: 128
     
   - name: GEMM2 
     dimensions: [M,L,N]
@@ -64,8 +63,3 @@ problem:
         - [[N]]
     ins: exp, D
     out: E 
-
-    instance: 
-      M: 128
-      N: 128
-      L: 128

@@ -35,6 +35,92 @@ std::string ParseWorkload(config::CompoundConfigNode config, problem::TileFlow::
 
   workload.set_io(Split(ins), Split(out));
 
+  Workload::Densities densities;
+  std::string density_distribution;
+
+  // shared pointer for parsed density distribution specs
+  std::shared_ptr<DensityDistributionSpecs> density_distribution_specs;
+  YAML::Node ynode;
+
+  // 1) shared density specification for all dataspaces
+  double common_avg_density;
+  if (config.exists("commonDensity")){
+    config::CompoundConfigNode density_config;
+    if (! config.lookup("commonDensity").isMap()){
+      config.lookupValue("commonDensity", common_avg_density);
+      ynode["distribution"] = "fixed-structured";
+      ynode["density"] = common_avg_density;
+      density_config = config::CompoundConfigNode(nullptr, ynode, new config::CompoundConfig("dummy.yaml"));
+    } else {
+      density_config = config.lookup("commonDensity");
+    }
+    auto density_specs = DensityDistributionFactory::ParseSpecs(density_config);
+    // assign all dataspaces the same density value
+    for (unsigned i = 0; i < GetShape()->NumDataSpaces; i++){
+      densities[i]= DensityDistributionFactory::Construct(density_specs);
+      // make sure the density model is correctly set
+      assert (densities[i] != NULL);
+    }
+  }
+
+  // 2) density specifications for each dataspace
+  else if (config.exists("densities"))
+  {
+    auto config_densities = config.lookup("densities");
+    for (unsigned i = 0; i < GetShape()->NumDataSpaces; i++){
+      double dataspace_avg_density;
+      config::CompoundConfigNode density_config;
+      std::string dataspace_name = GetShape()->DataSpaceIDToName.at(i);
+
+      if (config_densities.exists(GetShape()->DataSpaceIDToName.at(i)))
+      {
+		config_densities.lookupValue(GetShape()->DataSpaceIDToName.at(i), dataspace_avg_density);
+        
+		// if the specific dataspace's density is specified
+        if (!config_densities.lookup(GetShape()->DataSpaceIDToName.at(i)).isMap())
+        {
+          // single number for density is given, default to fixed density distribution
+          assert(config_densities.lookupValue(GetShape()->DataSpaceIDToName.at(i), dataspace_avg_density));
+          ynode["distribution"] = "fixed-structured";
+          ynode["density"] = dataspace_avg_density;
+          density_config = config::CompoundConfigNode(nullptr, ynode, new config::CompoundConfig("dummy.yaml"));
+        } else
+        {
+          density_config = config_densities.lookup(GetShape()->DataSpaceIDToName.at(i));
+        }
+        auto density_specs = DensityDistributionFactory::ParseSpecs(density_config);
+        densities[i] = DensityDistributionFactory::Construct(density_specs);
+      }
+      else
+      {
+        // no density specified, roll back to default
+        ynode["distribution"] = "fixed-structured";
+        ynode["density"] = 1.0;
+        density_config = config::CompoundConfigNode(nullptr, ynode, new config::CompoundConfig("dummy.yaml"));
+        auto density_specs = DensityDistributionFactory::ParseSpecs(density_config);
+        densities[i]= DensityDistributionFactory::Construct(density_specs);
+      }
+
+      // make sure the density model is correctly set
+      assert (densities[i] != NULL);
+    }
+
+    // 3) no density specification -> dense workload tensors
+  } else {
+    config::CompoundConfigNode density_config;
+    for (unsigned i = 0; i < GetShape()->NumDataSpaces; i++){
+      ynode["distribution"] = "fixed-structured";
+      ynode["density"] = 1.0;
+      density_config = config::CompoundConfigNode(nullptr, ynode, new config::CompoundConfig("dummy.yaml"));
+      auto density_specs = DensityDistributionFactory::ParseSpecs(density_config);
+      densities[i]= DensityDistributionFactory::Construct(density_specs);
+
+      // make sure the density model is correctly set
+      assert (densities[i] != NULL);
+    }
+  }
+  workload.SetDensities(densities);
+
   return name;
 }
 
@@ -87,14 +173,40 @@ void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads) {
   }
 
   if (config.exists("coefficient")) {
-    workloads.set_coeff(config.lookup("coefficient"));
+    workloads.set_coeffs(config);
   }
+}
+
+void Workloads::set_coeffs(const config::CompoundConfigNode& coeffs){
+    for (unsigned i = 0; i < GetShape()->NumCoefficients; i++)
+    {
+      coefficients_[i] = GetShape()->DefaultCoefficients.at(i);
+      coeffs.lookupValue(GetShape()->CoefficientIDToName.at(i), coefficients_[i]);
+    }
 }
 
 bool Workloads::add_workload(const std::string & name, std::shared_ptr<Workload>& workload) {
   if (workloads_.count(name)) {
     TILEFLOW_WARNING("Duplicate op named " << name << ". Drop all but the first.");
     return false;
+  }
+
+  auto shape_ = workload->GetShape();
+  for (auto& kv: shape_->DataSpaceIDToName) {
+    std::string access_pattern_name = name + "::" + kv.second;
+    auto & id = common_shape_.NumDataSpaces;
+    common_shape_.DataSpaceOrder[id] = shape_->DataSpaceOrder.at(kv.first);
+    common_shape_.IsReadWriteDataSpace[id] = shape_->IsReadWriteDataSpace.at(kv.first);
+    common_shape_.DataSpaceIDToName[id] = access_pattern_name;
+    common_shape_.DataSpaceNameToID[access_pattern_name] = id;
+    densities_[id] = workload->GetDensity(kv.first);
+    id++;
+  }
+
+  for (auto& kv: shape_->CoefficientNameToID) {
+    std::string coeff_name = kv.first;
+    common_shape_.CoefficientIDToName[common_shape_.NumCoefficients] = coeff_name;
+    common_shape_.CoefficientNameToID[coeff_name] = common_shape_.NumCoefficients++;
   }
 
   workloads_[name] = std::move(workload);
@@ -115,7 +227,7 @@ void Workload::set_io(const std::vector<std::string>& ins, const std::vector<std
 void Workloads::Print() {
   std::cout << "--------------Workloads------------" << std::endl;
   std::cout << "dimensions:";
-  for (auto& kv: factorized_bounds) 
+  for (auto& kv: factorized_bounds_) 
     std::cout << "[" << common_shape_.FactorizedDimensionIDToName[kv.first] 
       << "," << kv.second << "]";
   std::cout << std::endl;
@@ -130,17 +242,17 @@ void Workloads::Print() {
   // }
   // std::cout << std::endl;
   std::cout << "Tensors:" << std::endl;
-  for (int i = 0; i < common_shape_.NumDataSpaces; ++i) {
+  for (int i = 0; i < (int)common_shape_.NumDataSpaces; ++i) {
     std::cout << "  " << common_shape_.DataSpaceIDToName[i];
     auto& proj = common_shape_.Projections[i];
     for (auto& expr: proj) {
       std::cout << "[";
       int tmp = 0;
       for (auto& term: expr) {
-        if (term.first != -1)
+        if (term.first != (unsigned)-1)
           std::cout << common_shape_.CoefficientIDToName[term.first] << "*";
         std::cout << common_shape_.FactorizedDimensionIDToName[term.second];
-        if (++tmp != expr.size())
+        if (++tmp != (int)expr.size())
           std::cout << "+";
       }
       std::cout << "]";
@@ -185,21 +297,6 @@ void Workload::apply_binding(const std::unordered_map<std::string, std::string>&
       common_shape_.NumFactorizedDimensions++;
     }
   }
-  
-  for (auto& kv: shape_.CoefficientNameToID) {
-    std::string coeff_name = name_ + "::" + kv.first;
-    common_shape_.CoefficientIDToName[common_shape_.NumCoefficients] = coeff_name;
-    common_shape_.CoefficientNameToID[coeff_name] = common_shape_.NumCoefficients++;
-  }
-  
-  for (auto& kv: shape_.DataSpaceIDToName) {
-    std::string access_pattern_name = name_ + "::" + kv.second;
-    auto & id = common_shape_.NumDataSpaces;
-    common_shape_.DataSpaceOrder[id] = shape_.DataSpaceOrder[kv.first];
-    common_shape_.IsReadWriteDataSpace[id] = shape_.IsReadWriteDataSpace[kv.first];
-    common_shape_.DataSpaceIDToName[id] = access_pattern_name;
-    common_shape_.DataSpaceNameToID[access_pattern_name] = id++;
-  }
 
   for (auto& proj: shape_.Projections) {
     common_shape_.Projections.emplace_back();
@@ -209,7 +306,7 @@ void Workload::apply_binding(const std::unordered_map<std::string, std::string>&
       auto & new_expr = new_proj.back();
       for (auto& term: expr) {
         Shape::CoefficientID new_coeff_id = term.first == shape_.NumCoefficients? -1:
-        common_shape_.CoefficientNameToID[name_+"::"+shape_.CoefficientIDToName[term.first]];
+        common_shape_.CoefficientNameToID[shape_.CoefficientIDToName[term.first]];
         Shape::FactorizedDimensionID new_factorized_dim = common_shape_.FactorizedDimensionNameToID[binding.at(shape_.FactorizedDimensionIDToName[term.second])];
         new_expr.emplace_back(new_coeff_id, new_factorized_dim);
       }
@@ -234,7 +331,18 @@ void Workloads::set_factorized_bound(const std::string& dim, int bound) {
     common_shape_.NumFlattenedDimensions ++;
     common_shape_.NumFactorizedDimensions ++;
   }
-  factorized_bounds[common_shape_.FactorizedDimensionNameToID[dim]] = bound;
+  factorized_bounds_[common_shape_.FactorizedDimensionNameToID[dim]] = bound;
+}
+
+const problem::Workload& Workloads::get_workload() const {
+  if (!workload_constructed_) {
+    workload_.SetShape(common_shape_);
+    workload_.SetCoefficients(coefficients_);
+    workload_.SetFactorizedBounds(factorized_bounds_);
+    workload_.SetDensities(densities_);
+    workload_constructed_ = true;
+  }
+  return workload_;
 }
 
 } // namespace TileFlow 

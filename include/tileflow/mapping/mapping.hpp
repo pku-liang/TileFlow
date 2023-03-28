@@ -58,7 +58,7 @@ public:
     void set_parent(Node* parent) {parent_ = parent;}
     inline const Node* get_parent() const {return parent_;}
 
-    virtual void display(std::string prefix, bool recursive = true) const {std::cout << prefix << std::endl;}
+    virtual void display(std::string prefix, bool = true) const {std::cout << prefix << std::endl;}
     virtual void accept(Visitor* visitor) const = 0;
     virtual ~Node() {for (auto node: children_) delete node;}
     friend class Visitor;
@@ -93,13 +93,14 @@ private:
     // std::pair<int, int> represent the <end, residual end>
     std::vector<loop::TileFlow::Descriptor> loopnests_;
     unsigned storage_level_;
-    TileNode::type_t type;
+    TileNode::type_t type_;
 
 public:
     TileNode(config::CompoundConfigNode config);
     void display(std::string prefix, bool recursive) const override;
     void accept(Visitor* visitor) const {visitor->visitTile(this);}
-    bool is_spatial() const {return type == Spatial;}
+    bool is_spatial() const {return type_ == Spatial;}
+    TileNode::type_t get_tile_type() const {return type_;}
     unsigned get_storage_level() const {return storage_level_;}
     loop::Nest constructLoopNest(
         const std::map<std::string, problem::Shape::FactorizedDimensionID>&) const;

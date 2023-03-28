@@ -1,7 +1,7 @@
 mapping:
   node-type: Tile 
   type: temporal 
-  factors: M=1 L=1 
+  factors: M=32 L=32 
   permutation: ML 
   target: MainMemory 
   
@@ -12,7 +12,7 @@ mapping:
     subtree: 
       - node-type: Tile 
         type: Spatial 
-        factors: M=1 L=1 
+        factors: M=4 L=4 
         split: 1
         permutation: ML 
         target: MainMemory
@@ -24,7 +24,7 @@ mapping:
           subtree: 
           - node-type: Tile 
             type: temporal  
-            factors: M=1 L=1 K=1
+            factors: M=4 L=4 K=64
             permutation: MLK 
             target: RegFile
             
@@ -39,7 +39,7 @@ mapping:
         subtree: 
         - node-type: Tile 
           type: Spatial 
-          factors: M=1 L=1
+          factors: M=4 L=4
           permutation: ML 
           split: 1
           target: MainMemory
@@ -47,7 +47,7 @@ mapping:
           subtree: 
           - node-type: Tile 
             type: temporal 
-            factors: M=1  L=1 
+            factors: M=4  L=4 
             permutation: ML 
             target: RegFile 
             
@@ -57,7 +57,7 @@ mapping:
               binding: M:M, L:L 
         - node-type: Tile
           type: Spatial 
-          factors: M=1 L=1 
+          factors: M=4 L=4 
           permutation: ML 
           split: 1
           target: MainMemory 
@@ -65,7 +65,7 @@ mapping:
           subtree:
           - node-type: Tile 
             type: temporal 
-            factors: M=1  L=1 N=1 
+            factors: M=4 L=4 N=64 
             permutation: MLN 
             target: RegFile
             

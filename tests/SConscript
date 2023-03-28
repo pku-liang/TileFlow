@@ -94,6 +94,7 @@ parser_sources = Split("""
 ../src/mapping/mapping.cpp
 ../src/loop-analysis/nest-analysis.cpp
 ../src/loop-analysis/memory-state.cpp
+../src/model/topology.cpp
 scripts/parser.cpp
 """)
 
