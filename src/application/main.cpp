@@ -36,7 +36,6 @@ int main(int argc, char* argv[])
   
   auto problem = root.lookup("problem");
   problem::TileFlow::Workloads workloads;
-  
 
   config::CompoundConfigNode arch;
 
@@ -52,6 +51,17 @@ int main(int argc, char* argv[])
   bool is_sparse_topology = root.exists("sparse_optimizations");
 
   model::Engine::Specs arch_specs_ = model::Engine::ParseSpecs(arch, is_sparse_topology);
+
+  if (root.exists("ERT"))
+  {
+    std::cout << "Found Accelergy ERT (energy reference table), replacing internal energy model." << std::endl;
+    auto ert = root.lookup("ERT");
+    arch_specs_.topology.ParseAccelergyERT(ert);
+    if (root.exists("ART")){ // Nellie: well, if the users have the version of Accelergy that generates ART
+      auto art = root.lookup("ART");
+      arch_specs_.topology.ParseAccelergyART(art);  
+    }
+  }
 
   std::cout << "Begin ParseWorkload..." << std::endl;
   problem::TileFlow::ParseWorkloads(problem, workloads);

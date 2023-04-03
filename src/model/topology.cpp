@@ -25,13 +25,14 @@ namespace TileFlow {
             cycles_.pop();
             auto& tile = analysis_.get_tile(node);
             auto storage_id = node->get_storage_level();
-            auto storage_level = topology_.GetStorageLevel(storage_id)->Clone();
+            auto storage_level = std::static_pointer_cast<model::BufferLevel>(topology_.GetStorageLevel(storage_id)->Clone());
             tiling::CompoundMask mask = {};
             for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces; ++pv) 
                 mask[pv] = true;
             storage_level->Evaluate(tile, mask, 
                 0, 
                 cycle, break_on_failure);
+            storage_level->FinalizeBufferEnergy();
             cycles_.push(storage_level->Cycles());
             energy_ += storage_level->Energy();
 
@@ -42,6 +43,13 @@ namespace TileFlow {
             auto du_net = connection.drain_update_network->Clone();
             du_net->Evaluate(tile, break_on_failure);
             energy_ += du_net->Energy();
+
+             std::cout << "Storage<" << storage_id << ">:" << std::endl 
+                << *storage_level; 
+            std::cout << "Connect<" << storage_id << ">:";
+            std::cout << "rf_net: " << rf_net->Energy();
+            std::cout << "du_net: " << du_net->Energy();
+            std::cout << std::endl;
         }
     }
 
@@ -78,6 +86,7 @@ namespace TileFlow {
             tile.compute_info.accesses, break_on_failure);
         cycles_.push(level->Cycles());
         energy_ += level->Energy();
+        std::cout << "Arithmetic::" << node->get_name() << ":" << level->Energy() << std::endl;
     }
 
     void StatCalculator::run(const Node* root) {

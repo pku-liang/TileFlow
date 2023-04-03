@@ -19,7 +19,7 @@ architecture:
       - name: RegFile
         class: regfile 
         attributes:
-          depth: 64 
+          depth: 112 
           width: 16 
           word-bits: 8
           read_bandwidth: 2

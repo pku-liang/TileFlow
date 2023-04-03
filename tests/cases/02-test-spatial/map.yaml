@@ -7,7 +7,7 @@ mapping:
   
   subtree: 
   - node-type: Tile 
-    type: Spatial 
+    type: spatial 
     factors: K=16
     permutation: K 
     target: MainMemory

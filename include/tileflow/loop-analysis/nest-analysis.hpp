@@ -15,6 +15,7 @@ using mapping::TileFlow::Node;
 using mapping::TileFlow::OpNode;
 using mapping::TileFlow::TileNode;
 using mapping::TileFlow::ScopeNode;
+using mapping::TileFlow::CollectNode;
 using mapping::TileFlow::Visitor;
 
 
@@ -126,7 +127,7 @@ namespace TileFlow {
         friend class PerfectLoopnestAnalyzer;
         friend class StorageLevelCalculator;
         friend class SpatialOffsetsCalculator;
-        friend class ComputeAccess;
+        friend class TileStatGenerator;
         friend class ComputeExpansion;
     };
 
@@ -147,6 +148,8 @@ namespace TileFlow {
     struct RetVal{
         MemoryState deltas_;
         MemoryState last_working_set_;
+        tiling::CompoundTile tile_;
+
 
         RetVal() {}
         RetVal(const problem::OperationPoint& low_pt, 
@@ -162,9 +165,24 @@ namespace TileFlow {
 
     std::ostream& operator<< (std::ostream& o, const RetVal& params);
 
+    class TileStatGenerator {
+        NestAnalysis& analysis_;     
+        void ComputeParentShareAccess(tiling::CompoundTile& tile);
+        void ComputePeerAccesses(tiling::CompoundTile& tile);
+        void ComputeReadUpdate(tiling::CompoundTile& tile);
+        void ComputeFill(tiling::CompoundTile& tile);
+        void ComputeDensityModels(tiling::CompoundTile& tile);
+        
+    public: 
+        TileStatGenerator(NestAnalysis& analysis): analysis_(analysis) {}
+        void visitTile(const TileNode*, tiling::CompoundTile& tile);
+        void visitOp(const OpNode*, tiling::CompoundTile& tile);
+    };
+
     class DatamovementCalculator: public mapping::TileFlow::Visitor {
         NestAnalysis& analysis_;
         const problem::Workload& workload_;
+        TileStatGenerator tile_generator_;
         /**
          * \brief the stack to pass parameter between nodes.
         */
@@ -176,10 +194,13 @@ namespace TileFlow {
         void visitTile(const TileNode*) override;
         void visitScope(const ScopeNode*) override;
         void visitOp(const OpNode*) override;
+        void visitCollect(const CollectNode*) override; 
     
     public:
         DatamovementCalculator(NestAnalysis& analysis): 
-            analysis_(analysis), workload_(analysis_.common_workload_){}
+            analysis_(analysis), workload_(analysis_.common_workload_),
+            TileStatGenerator(analysis){}
+        
         void run(const Node*) override;
         friend class PerfectLoopnestAnalyzer;
     };
@@ -205,6 +226,23 @@ namespace TileFlow {
             bool at_boundary);
 
         std::uint64_t SpatialIDL2P(std::uint64_t logical_id);
+        problem::PerDataSpace<AccessStatMatrix> ComputeAccessStat(
+            const MemoryState& last_working_set,
+            const MemoryState& delta 
+        );
+        void ComputeLinkTransfer(
+            const MemoryState& last_working_set, 
+            const MemoryState& delta,
+            problem::PerDataSpace<std::unordered_set<std::uint64_t>>& unaccounted_delta,
+            problem::PerDataSpace<std::size_t>& link_transfers
+        );
+
+        void ComputeAccessStat(
+            const MemoryState& delta, 
+            problem::PerDataSpace<std::unordered_set<std::uint64_t>>& unaccounted_delta, 
+            problem::PerDataSpace<AccessStatMatrix>& access_stat,
+            bool enable_multicast = true 
+        );
     public: 
         PerfectLoopnestAnalyzer(
             DatamovementCalculator& dm,
@@ -302,20 +340,7 @@ namespace TileFlow {
     public: 
         SpatialOffsetsCalculator(NestAnalysis& analysis): analysis_(analysis){
         }
-    };
-
-    class ComputeAccess: public mapping::TileFlow::Visitor {
-        void visitTile(const TileNode*) override;
-        void visitOp(const OpNode*) override;
-        NestAnalysis& analysis_;     
-        void ComputeParentShareAccess(const TileNode*);
-        void ComputePeerAccesses(const TileNode*);
-        void ComputeReadUpdateFill(const TileNode*);
-        void ComputeDensityModels(const TileNode*);
-        
-    public: 
-        ComputeAccess(NestAnalysis& analysis): analysis_(analysis) {}
-    };
+    };    
 
     class ComputeExpansion: public mapping::TileFlow::Visitor {
         void visitTile(const TileNode*) override;

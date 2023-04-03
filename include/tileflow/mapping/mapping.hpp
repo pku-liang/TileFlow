@@ -17,15 +17,18 @@ class Node;
 class ScopeNode;
 class TileNode;
 class OpNode;
+class CollectNode;
 
 class Visitor {
 protected:
     virtual void visitScope(const ScopeNode*);
     virtual void visitTile(const TileNode*);
     virtual void visitOp(const OpNode*);
+    virtual void visitCollect(const CollectNode*);
     friend class TileNode;
     friend class ScopeNode;
     friend class OpNode;
+    friend class CollectNode;
 public:
     virtual void run (const Node*);
 };
@@ -35,19 +38,25 @@ public:
     enum type_t{
         Tile,
         Op,
-        Scope
+        Scope,
+        Collect 
     };
 protected:
     Node::type_t type_;
     Node* parent_ = nullptr;
     std::vector<Node*> children_;
-public: 
-    
+    std::string storage_level_name_;
+    unsigned storage_level_;
+
+    void ParseStorageLevel(config::CompoundConfigNode config);
     std::unordered_map<std::string, std::pair<int, int> > ParseFactors(const std::string & factors);
     std::vector<std::string> ParsePermutations(const std::string& buffer);
-    unsigned ParseStorageLevel(config::CompoundConfigNode config);
 
+public: 
     Node(type_t t_): type_(t_) {}
+    
+    unsigned get_storage_level() const {return storage_level_;}
+    std::string get_storage_name() const {return storage_level_name_;}
     type_t get_type() const {return type_;}
     void add_child(Node* child) {assert(child != nullptr); children_.push_back(child); child->set_parent(this);}
     const std::vector<const Node*> get_children() const{
@@ -92,7 +101,6 @@ private:
 
     // std::pair<int, int> represent the <end, residual end>
     std::vector<loop::TileFlow::Descriptor> loopnests_;
-    unsigned storage_level_;
     TileNode::type_t type_;
 
 public:
@@ -101,7 +109,7 @@ public:
     void accept(Visitor* visitor) const {visitor->visitTile(this);}
     bool is_spatial() const {return type_ == Spatial;}
     TileNode::type_t get_tile_type() const {return type_;}
-    unsigned get_storage_level() const {return storage_level_;}
+    
     loop::Nest constructLoopNest(
         const std::map<std::string, problem::Shape::FactorizedDimensionID>&) const;
     size_t n_level() const {return loopnests_.size();}
@@ -121,6 +129,13 @@ public:
     void accept(Visitor* visitor) const {visitor->visitOp(this);}
     const std::shared_ptr<problem::TileFlow::Workload>& get_workload() const {return p_workload;}
 };
+
+class CollectNode: public Node {
+    unsigned storage_level_;
+    std::string storage_level_name_;
+public: 
+    void accept(Visitor* visitor) const {visitor->visitCollect(this);}
+}; // a placeholder node to provide 
 
 struct Mapping {
     std::map<unsigned, std::uint64_t> fanoutX_map;

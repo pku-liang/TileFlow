@@ -20,7 +20,7 @@ if GetOption('clang'):
 else:
   env.Append(CCFLAGS = ['-fmax-errors=1'])
 
-env.Append(LIBPATH = ['.', os.path.join(env['BUILD_BASE_DIR'], 'lib')])
+env.Append(LIBPATH = ['.', os.path.join(env['BUILD_BASE_DIR'], '3rdparty/timeloop/lib')])
 # If we are doing a static build, the timeloop library must be the first
 # item in the link order.
 if GetOption('link_static'):
@@ -83,8 +83,8 @@ if "NTLPATH" in os.environ:
     env.Append(LIBPATH = [NTLPATH + '/lib'])
     env.Append(CPPFLAGS = ['-I' + NTLPATH + '/include'])
 
-if GetOption('use_accelergy'):
-    env["CPPDEFINES"] += [('USE_ACCELERGY')]
+# if GetOption('use_accelergy'):
+#     env["CPPDEFINES"] += [('USE_ACCELERGY')]
 
 # if not os.path.isdir('./pat'):
 #     print ("ERROR: 'src/pat' not found. Please create a symbolic link to the source code for the power-area-timing model and place it in src/pat. E.g., ln -s pat-public/src/pat src/pat.")
@@ -103,10 +103,10 @@ lib_sources = Split("""
 libenv = env.Clone()
 if GetOption("link_static"):
     lib_tileflow = libenv.StaticLibrary(target="tileflow", source = lib_sources)
-    libenv.Install(env["BUILD_BASE_DIR"] + "/lib", [lib_tileflow]) 
+    libenv.Install("lib", [lib_tileflow]) 
 else:
-    lib_tileflow_shared = libenv.SharedLibrary(target = "tileFlow", source = lib_sources)
-    libenv.Install(env['BUILD_BASE_DIR'] + '/lib', [ lib_tileflow_shared]) 
+    lib_tileflow_shared = libenv.SharedLibrary(target = "tileflow", source = lib_sources)
+    libenv.Install('lib', [ lib_tileflow_shared]) 
 
 model_sources = Split("""
 ./application/main.cpp
@@ -114,4 +114,4 @@ model_sources = Split("""
 
 bin_model = env.Program(target = 'tileflow', source = model_sources) 
 
-env.Install(env['BUILD_BASE_DIR'] + "/bin", [bin_model])
+env.Install("bin", [bin_model])

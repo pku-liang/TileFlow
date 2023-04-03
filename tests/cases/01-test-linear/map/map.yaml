@@ -1,7 +1,7 @@
 mapping:
   node-type: Tile 
   type: temporal 
-  factors: M=8 N=16 K=32
+  factors: M=32 N=64 K=128
   permutation: MNK 
   target: MainMemory 
       

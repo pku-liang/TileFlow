@@ -226,14 +226,15 @@ namespace analysis
             }
             if (analysis_.tiles_.count(node)) {
                 auto& info_ = analysis_.tiles_.at(node).data_movement_info;
-                std::cout << prefix_ << "size, read, fill, updates:" << std::endl; 
-                for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces;   
-                    pv ++) {
-                    auto& info = info_[pv];
-                    std::cout << prefix_ << "  " << problem::GetShape()->DataSpaceIDToName.at(pv)
-                        << ": " << info.size << "," << info.reads << "," << info.fills
-                        << "," << info.updates << std::endl;
-                }
+                std::cout << info_;
+                // std::cout << prefix_ << "size, read, fill, updates:" << std::endl; 
+                // for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces;   
+                //     pv ++) {
+                //     auto& info = info_[pv];
+                //     std::cout << prefix_ << "  " << problem::GetShape()->DataSpaceIDToName.at(pv)
+                //         << ": " << info.size << "," << info.reads << "," << info.fills
+                //         << "," << info.updates << std::endl;
+                // }
             }
 
             node->display(prefix_, false);
@@ -273,152 +274,6 @@ namespace analysis
             std::cout << prefix_<< "accesses:" << compute_info.accesses << std::endl;
             std::cout << prefix_<< "expanison:" << compute_info.max_x_expansion 
                 << "," << compute_info.max_y_expansion << std::endl;
-        }
-
-        void DatamovementCalculator::run(const Node *root)
-        {
-            MemoryState::set_workload(&workload_);
-            InputParam input;
-            input.num_epochs_ = 1;
-            for (unsigned dim = 0;
-                 dim < problem::GetShape()->NumFlattenedDimensions; dim++)
-            {
-                input.cur_transform_[dim] = 0;
-            }
-            input.curr_node_ = root;
-            input_stack_.push(input);
-            root->accept(this);
-        }
-
-        void DatamovementCalculator::visitOp(const OpNode *node)
-        {
-            auto input = input_stack_.top();
-            assert(input.curr_node_ == node);
-            input_stack_.pop();
-            auto& compute_info = analysis_.configs[node].stats_[input.space_stamp_].compute_info_;
-            compute_info.accesses += input.num_epochs_;
-            compute_info.replication_factor = analysis_.configs[node].replication_factor;
-            // Add a mask here.
-            RetVal ret;
-            auto & active_tensors = analysis_.configs.at(node).active_read_tensors;
-            problem::OperationSpace point_set(MemoryState::workload_,
-                 input.cur_transform_, input.cur_transform_); // A single point
-            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++) {
-                if (find(active_tensors.begin(), active_tensors.end(), pv) 
-                    == active_tensors.end()) 
-                    point_set.GetDataSpace(pv).Reset();
-            }
-            ret.last_working_set_.insert(0, point_set);
-            ret.deltas_ = ret.last_working_set_ - input.init_working_set_;
-
-            // std::cout << "--------Op---------" << std::endl;
-            // std::cout << input << std::endl;
-            // std::cout << ret << std::endl;
-            // std::cout << "-------------------" << std::endl;
-            ret_stack_.push(ret);
-        }
-
-        void DatamovementCalculator::visitTile(const TileNode *node)
-        {
-            auto &input = input_stack_.top();
-            assert(input.curr_node_ == node);
-            analysis::TileFlow::PerfectLoopnestAnalyzer analyzer(*this, input, analysis_.configs[node]);
-            auto &config = analysis_.configs[node];
-            analyzer.init(&analysis_.common_workload_, &config.loop_nest);
-            auto ret = analyzer.calculateDataMovement();
-            ret_stack_.push(ret);
-            
-        }
-
-        void DatamovementCalculator::visitScope(const ScopeNode *node)
-        {
-            auto input = input_stack_.top();
-            assert(input.curr_node_ == node);
-            input_stack_.pop();
-            auto type = node->get_scope_type();
-            auto ret_ = RetVal();
-            if (type == ScopeNode::Sequential)
-            {
-                for (auto &child : node->get_children())
-                {
-                    input.curr_node_ = child;
-                    input_stack_.push(input);
-                    child->accept(this);
-                    auto ret = ret_stack_.top();
-                    ret_stack_.pop();
-                    ret_.deltas_.Add(ret.deltas_);
-                    input.init_working_set_ = ret.last_working_set_;
-                }
-                ret_.last_working_set_ = input.init_working_set_;
-            }
-            else if (type == ScopeNode::Parallel)
-            {
-                for (auto &child : node->get_children())
-                {
-                    input.curr_node_ = child;
-                    input_stack_.push(input);
-                    child->accept(this);
-                    auto ret = ret_stack_.top();
-                    ret_stack_.pop();
-                    ret_.deltas_.Add(ret.deltas_);
-                    ret_.last_working_set_.Union(ret.last_working_set_);
-                }
-            }
-            else if (type == ScopeNode::Sharing)
-            {
-                for (auto &child : node->get_children())
-                {
-                    input.curr_node_ = child;
-                    input_stack_.push(input);
-                    child->accept(this);
-                    auto ret = ret_stack_.top();
-                    ret_stack_.pop();
-                    ret_.last_working_set_.Union(ret.last_working_set_);
-                }
-                ret_.deltas_ = ret_.last_working_set_.Substract(input.init_working_set_);
-            }
-            else if (type == ScopeNode::Pipeline)
-            { // other schema's children shares the memory
-                // 0, 1, ..., children.size() - 1
-                /*
-                0  1  2  3  4
-                p1          0
-                p2 p1       1
-                p3 p2 p1    2
-                   p3 p2 p1 3
-                      p3 p2 4
-                         p3 5
-                [:i]
-                1 p0 p1 p0 ... pk pk-1, ..., p1;
-                2 pk-1, ..., p0;
-                ...
-                N+1-k pk-1 ... p0
-                ...
-                N-1 pk-1, pk-2
-                N pk-1
-                */
-                for (auto &child : node->get_children())
-                {
-                    input.curr_node_ = child;
-                    input_stack_.push(input);
-                    child->accept(this);
-                    auto ret = ret_stack_.top();
-                    ret_stack_.pop();
-                    ret_.deltas_.Union(ret.deltas_);
-                    ret_.last_working_set_.Union(ret.last_working_set_);
-                }
-            }
-
-            ret_stack_.push(ret_);
-        }
-
-        RetVal DatamovementCalculator::computeDelta(const InputParam &input)
-        {
-            input_stack_.push(input);
-            input.curr_node_->accept(this);
-            auto ret = ret_stack_.top();
-            ret_stack_.pop();
-            return ret;
         }
 
         void PerfectLoopnestAnalyzer::init(const problem::Workload *wl, const loop::Nest *nest)
@@ -656,15 +511,25 @@ namespace analysis
             // the init
             {
                 InputParam input = input_;
-                input.num_epochs_ = 1;
+                input.init_working_set_ = {};
                 input.curr_node_ = input_.curr_node_->get_children().front();
                 auto ret_val = dm_.computeDelta(input);
+                std::cout << "<" << input_.curr_node_->get_storage_name() << "::init>" << std::endl;
+                std::cout << "last_index:" << input.cur_transform_ << std::endl;
+                std::cout << input;
+                std::cout << ret_val; 
+                std::cout << "</" << input_.curr_node_->get_storage_name() << "::init>" << std::endl;
                 for (auto &kv : ret_val.deltas_.getDataSpaces()){
                     for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++){
                         access_stat[pv](1, 1).accesses += input.num_epochs_ * kv.second.GetSize(pv);
                     }
                 }
             }
+
+            int all_iter = 1;
+            for (auto lc: loop_counts) all_iter *= lc;
+
+            int real_iter = 1;
 
             for (int i = 0; i < (int)nest_state_.size(); ++i) {
                 if (loop_counts[i] <= 1) continue;
@@ -681,18 +546,27 @@ namespace analysis
                 input.num_epochs_ = num_epochs_ * (trip_counts[i+1] - trip_counts[i]);
                 input.cur_transform_ = input_.cur_transform_;
                 input.cur_transform_[dims[i]] += scales[i];
+                real_iter += input.num_epochs_;
                 ret_val = dm_.computeDelta(input);  
-                // std::cout << "--------------" << std::endl;
-                // std::cout << "last_index:" << last_index << std::endl;
-                // std::cout << input;
-                // std::cout << ret_val; 
-                // std::cout << "--------------" << std::endl;
+                std::cout << "<" << input_.curr_node_->get_storage_name() << "::"
+                     << problem::GetShape()->FlattenedDimensionIDToName.at(nest_state_[i].descriptor.dimension)
+                    << ">" << std::endl;
+                std::cout << "last_index:" << last_index << std::endl;
+                std::cout << input;
+                std::cout << ret_val; 
+                std::cout << "</" << input_.curr_node_->get_storage_name() << "::"
+                     << problem::GetShape()->FlattenedDimensionIDToName.at(nest_state_[i].descriptor.dimension)
+                    << ">" << std::endl;
                 for (auto &kv : ret_val.deltas_.getDataSpaces()){
                     for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++){
                         access_stat[pv](1, 1).accesses += input.num_epochs_ * kv.second.GetSize(pv);
                     }
                 }
             }
+
+            std::cout << "num_epochs_: " << input_.num_epochs_ << std::endl;
+            std::cout << "all_iter: " << all_iter << std::endl;
+            std::cout << "real_iter: " << real_iter << std::endl;
         }
 
         RetVal PerfectLoopnestAnalyzer::ComputeSpatialWorkingSet()
@@ -812,6 +686,240 @@ namespace analysis
         std::uint64_t PerfectLoopnestAnalyzer::SpatialIDL2P(std::uint64_t logical_id) {
             return ((logical_id % config_.logical_y) + config_.spatial_offset_y) +
                 ((logical_id / config_.logical_y) + config_.spatial_offset_x) * config_.fanout_y;
+        }
+
+        problem::PerDataSpace<AccessStatMatrix> PerfectLoopnestAnalyzer::ComputeAccessStat(
+            const MemoryState& last_working_set,
+            const MemoryState& delta 
+        ) {
+            problem::PerDataSpace<AccessStatMatrix> access_stats;
+            problem::PerDataSpace<std::size_t> link_transfers;
+            problem::PerDataSpace<std::unordered_set<std::uint64_t>> unaccounted_delta;
+            for (auto& delta: delta.getDataSpaces())
+            {
+                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
+                unaccounted_delta[pv].insert(delta.first);
+            }
+            const int enable_link_transfer = true;
+            if (enable_link_transfer) {
+                ComputeLinkTransfer(last_working_set, delta, unaccounted_delta, link_transfers);
+            }
+            ComputeAccessStat(delta, unaccounted_delta, access_stats);
+
+            return access_stats;   
+        }
+
+        void PerfectLoopnestAnalyzer::ComputeLinkTransfer(
+            const MemoryState& last_working_set, 
+            const MemoryState& delta,
+            problem::PerDataSpace<std::unordered_set<std::uint64_t>>& unaccounted_delta,
+            problem::PerDataSpace<std::size_t>& link_transfers
+        ) {
+            const std::vector<std::pair<int, int> > routings = {
+                {-1,0}, {0,-1}, {0,1}, {1,0}
+            };
+            auto h_size = config_.fanout_x;
+            auto v_size = config_.fanout_y;
+
+            auto GetLinearIndex = [&h_size, &v_size](std::uint64_t h_id, std::uint64_t v_id)
+                {
+                ASSERT(h_id < h_size && v_id < v_size);
+                std::uint64_t linearIndex = v_id * h_size + h_id;  // row major layout
+                return linearIndex;
+                };
+
+            auto& cur_spatial_deltas = delta.getDataSpaces();
+            auto& prev_spatial_deltas = last_working_set.getDataSpaces();
+
+            int num_spatial_elems = h_size * v_size;
+
+            std::vector<problem::PerDataSpace<bool>> inter_elem_reuse;
+            inter_elem_reuse.resize(num_spatial_elems);
+            for (int i = 0; i < num_spatial_elems; i++)
+            {
+                inter_elem_reuse.at(i).fill(false);
+            }
+
+            problem::PerDataSpace<bool> no_link_transfer;
+            for(unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
+            {
+                no_link_transfer[pv] = false;
+            }
+
+            for (auto& route: routings) {
+                for (int h_id = 0; h_id < h_size; h_id++)
+                {
+                    for (int v_id = 0; v_id < v_size; v_id++)
+                    {
+                        int h_id_ = h_id + route.first;
+                        int v_id_ = v_id + route.second;
+                        if (h_id_ < 0 || h_id_ >= h_size || v_id_ < 0 || v_id_ >= v_size)   
+                            continue;
+                        auto cur_skewed_spatial_index = GetLinearIndex(h_id, v_id);
+                        auto prev_skewed_spatial_index = GetLinearIndex(h_id_, v_id_);
+                        CompareSpatioTemporalDeltas(cur_spatial_deltas, prev_spatial_deltas,
+                                                    cur_skewed_spatial_index, prev_skewed_spatial_index,
+                                                    inter_elem_reuse,
+                                                    no_link_transfer);
+                    }
+                }
+            }
+
+            // Compute the total number of accesses that can be bypassed
+            // by using link transfers
+            for (auto& delta: cur_spatial_deltas)
+            //  for (int i = 0; i < num_spatial_elems; i++)
+            {
+                auto& cur_skewed_spatial_index = delta.first;
+                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
+                {
+                    if (inter_elem_reuse.at(cur_skewed_spatial_index)[pv])
+                    {
+                        link_transfers[pv] += (delta.second.GetSize(pv) * num_epochs_);
+                        auto unaccounted_it = unaccounted_delta[pv].find(cur_skewed_spatial_index);
+                        ASSERT(unaccounted_it != unaccounted_delta[pv].end());
+                        unaccounted_delta[pv].erase(unaccounted_it);
+                    }
+                }
+            }
+
+        }
+
+        void PerfectLoopnestAnalyzer::ComputeAccessStat(
+            const MemoryState& delta, 
+            problem::PerDataSpace<std::unordered_set<std::uint64_t>>& unaccounted_delta, 
+            problem::PerDataSpace<AccessStatMatrix>& access_stats,
+            bool enable_multicast
+        ){
+            auto& spatial_deltas = delta.getDataSpaces();
+
+            // For each data type, records the number of unaccounted deltas
+            // that the current delta matches with. This will be used
+            // to infer the multicast factor for a specific delta.
+            // reused across loop iterations to avoid initialization overheads.
+            problem::PerDataSpace<uint64_t> num_matches;
+
+            // Prepare a legacy-style multicast/scatter signature to collect the
+            // delta data, then populate the new access stats.
+            struct TempAccessStats
+            {
+                double accesses = 0;
+                std::uint64_t scatter_factor = 0;
+                double hops = 0.0;
+            };
+            problem::PerDataSpace<std::unordered_map<std::uint64_t, TempAccessStats>> temp_stats;
+
+            // FIXME: we should only be looking at physical dimensions here. The problem
+            // is that sparse mappings may appear to exceed the physical dimensions before
+            // space-skipping is applied. The very notion of spatial skew and physical
+            // location for space-skipping sparse mappings is something we need to figure
+            // out.
+            auto h_size = config_.fanout_x;
+            auto v_size = config_.fanout_y;
+            
+
+            for (auto delta_it = spatial_deltas.begin(); delta_it != spatial_deltas.end(); delta_it++)
+                //for (std::uint64_t i = 0; i < num_deltas; i++)
+            {
+                auto& skewed_spatial_index = delta_it->first;
+                auto& delta = delta_it->second;
+
+                num_matches.fill(0);
+                
+                problem::PerDataSpace<std::vector<std::uint64_t>> match_set;
+
+                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
+                {
+                    auto unaccounted_it = unaccounted_delta[pv].find(skewed_spatial_index);
+                    if (unaccounted_it == unaccounted_delta[pv].end())
+                        //if (!unaccounted_delta[i][pv])
+                    {
+                        // this delta was already accounted for,
+                        // skip the comparisons.
+                        continue;
+                    }
+
+                    unaccounted_delta[pv].erase(unaccounted_it);
+                    //unaccounted_delta[i][pv] = false;
+                    num_matches[pv] = 1;  // we match with ourselves.
+                    match_set[pv].push_back(skewed_spatial_index);
+
+                    for (auto delta_other_it = std::next(delta_it); delta_other_it != spatial_deltas.end(); delta_other_it++)
+                    //for (std::uint64_t j = i + 1; j < num_deltas; j++)
+                    {
+                        auto& skewed_other_spatial_index = delta_other_it->first;
+                        auto& delta_other = delta_other_it->second;
+
+                        auto unaccounted_other_it = unaccounted_delta[pv].find(skewed_other_spatial_index);
+                        if (unaccounted_other_it != unaccounted_delta[pv].end())
+                            //if (unaccounted_delta[j][pv])
+                        {
+                            if (delta.CheckEquality(delta_other, pv))
+                            //if (spatial_deltas[i].CheckEquality(spatial_deltas[j], pv))
+                            {
+                            // We have a match, record it
+                            unaccounted_delta[pv].erase(unaccounted_other_it);
+                            //unaccounted_delta[j][pv] = false;
+                            num_matches[pv]++;
+                            match_set[pv].push_back(skewed_other_spatial_index);
+                            }
+                        }
+                    }
+                }
+
+                // update the number of accesses at different multicast factors.
+                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
+                {
+                    if (num_matches[pv] > 0 && delta.GetSize(pv) > 0)
+                    {
+                        auto& temp_struct = temp_stats[pv][num_matches[pv]];
+                        temp_struct.accesses += (delta.GetSize(pv) * num_epochs_);
+                        temp_struct.scatter_factor++;
+
+                        // Compute the average number of hops from the edge of the array
+                        // (at this level) to the nodes in the match set.
+                        // Assume injection point is at center of V-axis. Routing algorithm is
+                        // to go along H maximally, then drop vertical paths.
+
+                        ASSERT(num_matches[pv] == match_set[pv].size());
+                        
+                        double hops = 0;
+                        
+                        std::uint64_t h_max = 0;
+                        for (auto& linear_id : match_set[pv])
+                        {
+                            std::uint64_t h_id = linear_id % h_size;
+                            h_max = std::max(h_max, h_id);
+                        }
+                        hops += double(h_max);
+                        
+                        double v_center = double(v_size-1) / 2;
+                        for (auto& linear_id : match_set[pv])
+                        {
+                            std::uint64_t v_id = linear_id / h_size;
+                            hops += std::abs(double(v_id) - v_center);
+                        }
+
+                        // Accumulate this into the running hop count. We'll finally divide this
+                        // by the scatter factor to get average hop count.
+                        temp_struct.hops += hops;
+                    }
+                }
+            }
+
+            // Populate the actual stats.
+            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
+            {
+                for (auto& x: temp_stats[pv])
+                {
+                    auto multicast = x.first;
+                    auto scatter = x.second.scatter_factor;
+                    if (enable_multicast)
+                        access_stats[pv](multicast, scatter) = { x.second.accesses, x.second.hops };
+                    else 
+                        access_stats[pv](1,scatter) = {x.second.accesses * multicast, x.second.hops};
+                }
+            }
         }
 
         void StorageLevelCalculator::visitScope(const ScopeNode* node) {
@@ -963,167 +1071,7 @@ namespace analysis
             return o; 
         }
 
-        void ComputeAccess::visitTile(const TileNode* node) {
-            if (!node->is_spatial()) {
-                auto & infos = analysis_.tiles_[node].data_movement_info;
-                auto & config = analysis_.configs[node];
-                for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces; pv++){
-                    auto& info = infos[pv];
-                    info.subnest = config.loop_nest.loops;
-                    for (auto& kv: config.stats_) {
-                        if ((int)kv.second.access_stat_.size() <= pv) {
-                            std::cout << "ERROR: size " << kv.second.access_stat_.size()
-                                << ", pv: " << pv << std::endl; 
-                        }
-                        info.access_stats.Accumulate(kv.second.access_stat_[pv]);
-                        // Is this correct?
-                        info.size += kv.second.max_size_[pv];
-                        info.link_transfers += kv.second.link_transfer_[pv];
-                    }
-                    int n_sample = config.stats_.size();
-                    assert(n_sample);
-                    info.access_stats.Divide(n_sample);
-                    info.size /= n_sample;
-                    info.link_transfers /= n_sample;
-                    info.shape = info.size;
-                    info.dataspace_id = (unsigned) pv;
-                    info.partition_size = 0;
-                    info.distributed_multicast = false;
-                    info.content_accesses = info.access_stats.TotalAccesses();
-                    info.peer_accesses = 0;
-                    info.peer_fills = 0;
-                    info.replication_factor = config.logical_x * config.logical_y;
-                    info.fanout = config.fanout_x * config.fanout_y; // is this correct?
-                    info.SetTensorRepresentation();
-                    
-                    info.parent_level = std::numeric_limits<unsigned>::max();
-                    info.child_level = std::numeric_limits<unsigned>::max();
-                }
-                ComputeParentShareAccess(node);
-                ComputePeerAccesses(node);
-                ComputeReadUpdateFill(node);
-                ComputeDensityModels(node);
-            }
 
-            for (auto child: node->get_children())
-                child->accept(this);
-        }
-
-        void ComputeAccess::visitOp(const OpNode* node) {
-            auto& stats_ = analysis_.configs[node].stats_;
-            double avg_accesses = 0.0;
-            for (auto& kv:stats_) {
-                // <space_stamp, >
-                avg_accesses += kv.second.compute_info_.accesses;
-            }
-            avg_accesses /= stats_.size();
-            auto & compute_info = analysis_.tiles_[node].compute_info;
-            compute_info.accesses += avg_accesses;
-            compute_info.replication_factor = analysis_.configs[node].replication_factor;
-        
-            for (unsigned op_id = 0; op_id < tiling::arithmeticOperationTypes.size();
-                 op_id++)
-            {
-                auto op_name = tiling::arithmeticOperationTypes[op_id];
-                compute_info.fine_grained_accesses[op_name] = 0;
-            }
-            compute_info.fine_grained_accesses["random_compute"] 
-                = compute_info.accesses * compute_info.replication_factor;
-            compute_info.avg_replication_factor = compute_info.replication_factor;
-        }
-
-        void ComputeAccess::ComputePeerAccesses(const TileNode*) {
-            // TODO 
-        }
-
-        void ComputeAccess::ComputeParentShareAccess(const TileNode* node) {
-            auto& info = analysis_.tiles_[node].data_movement_info;
-            for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces; 
-                ++pv) {
-                    info[pv].parent_access_share = 0;
-                }
-            
-            int fanout = 1;
-
-            // find parent;
-            const Node* parent = node->get_parent();
-            while(parent != nullptr) {
-                auto parent_ = static_cast<const TileNode*>(parent);
-                if (parent_->get_tile_type() == TileNode::Temporal) break;
-                else fanout = analysis_.configs.at(parent_).logical_fanout;
-                parent = parent->get_parent();
-            }
-
-            if (parent == nullptr) { // root
-                return;
-            }
-
-            auto& active_tensors = analysis_.configs.at(node).active_fill_tensors;
-            auto& parent_info = analysis_.tiles_[parent].data_movement_info;
-
-            for (auto pv: active_tensors) {
-                auto & pv_info = info[pv];
-                for (auto& x: parent_info[pv].access_stats.stats){
-                    auto multicast_factor = x.first.first;
-                    auto accesses = x.second.accesses;
-                    pv_info.parent_access_share += (accesses * multicast_factor) / (fanout);
-                }
-            }
-        }
-
-        void ComputeAccess::ComputeReadUpdateFill(const TileNode* node) {
-            auto& info_ = analysis_.tiles_[node].data_movement_info;
-            for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces; 
-                ++pv) {
-                auto& info = info_[pv];
-                info.reads = std::round(info.content_accesses + info.peer_accesses);
-                info.fills = info.parent_access_share + info.peer_fills;
-                info.updates = info.temporal_reductions = 0;
-                if (problem::GetShape()->IsReadWriteDataSpace.at(pv)) {
-                    info.updates = std::round(info.content_accesses);
-                    info.temporal_reductions = std::round(info.content_accesses + info.peer_accesses);
-                }
-
-                auto& fine_grained_data_accesses = info.fine_grained_data_accesses;
-                auto& fine_grained_format_accesses = info.fine_grained_format_accesses;
-
-                fine_grained_format_accesses = {};
-
-                for (unsigned op_id = 0; op_id < tiling::storageOperationTypes.size(); op_id++)
-                {
-                    auto op_name = tiling::storageOperationTypes[op_id];
-                    fine_grained_data_accesses[op_name] = 0;
-                    if (op_name.find("metadata") != std::string::npos)
-                    {
-                        fine_grained_format_accesses[op_name] = {};
-                    }
-                    else
-                    {
-                        fine_grained_data_accesses[op_name] = 0;
-                    }
-                }
-
-                // default to uncompressed without metadata
-                fine_grained_data_accesses["random_read"] = info.reads;
-                fine_grained_data_accesses["random_fill"] = info.fills;
-                fine_grained_data_accesses["random_update"] = info.updates;
-            }
-        }
-
-        void ComputeAccess::ComputeDensityModels(const TileNode* node) {
-            auto & info_ = analysis_.tiles_[node].data_movement_info;
-            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
-            {
-                auto & info = info_[pv];
-                // TODO: might want to have a new data structure for post processed sparse traffic,
-                //       now we are carrying both dense and sparse in tile info
-                info.expected_density = 1.0;
-                info.SetDensityModel(analysis_.common_workload_.GetDensity(pv));
-                info.expected_data_occupancy = info.shape;
-                info.avg_replication_factor = info.replication_factor;
-            }
-        } 
-        
 
         void ComputeExpansion::visitTile(const TileNode* node) {
             if (node->get_tile_type() == TileNode::Spatial) {

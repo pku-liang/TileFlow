@@ -4,9 +4,9 @@ problem:
     outs: C
   dimensions: [M,N,K]
   instance:
-    M: 128
-    N: 128
-    K: 128 
+    M: 512
+    N: 512
+    K: 512
 
   ops:
   - name: GEMM

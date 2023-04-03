@@ -66,11 +66,11 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
     
     TILEFLOW_ASSERT(iters.size() == loop_bounds.size(), "permutation & factor iter mismatch");
 
-    storage_level_ = ParseStorageLevel(config);
+    ParseStorageLevel(config);
 
     unsigned split = iters.size();
     config.lookupValue("split", split);
-    for (unsigned i = 0; i < iters.size(); ++i) {
+    for (int i = (int)iters.size()-1; i >= 0; --i) {
         loopnests_.emplace_back();
         loop::TileFlow::Descriptor& loop = loopnests_.back();
         loop.name_ = iters[i];
@@ -79,7 +79,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
         loop.residual_end = loop_bounds[iters[i]].second;
         loop.stride = 1;
         loop.spacetime_dimension = type_s == "spatial"? 
-        (i < split? spacetime::Dimension::SpaceX : spacetime::Dimension::SpaceY) 
+        ((unsigned)i < split? spacetime::Dimension::SpaceX : spacetime::Dimension::SpaceY) 
         : spacetime::Dimension::Time; 
     }
     
@@ -127,7 +127,7 @@ std::vector<std::string> Node::ParsePermutations(
     return iters;
 }
 
-unsigned Node::ParseStorageLevel(config::CompoundConfigNode directive)
+void Node::ParseStorageLevel(config::CompoundConfigNode directive)
 {
   auto num_storage_levels = arch_props_.StorageLevels();
     
@@ -161,7 +161,8 @@ unsigned Node::ParseStorageLevel(config::CompoundConfigNode directive)
 
   assert(storage_level_id < num_storage_levels);
 
-  return storage_level_id;
+  storage_level_name_ = storage_level_name;
+  storage_level_ = storage_level_id;
 }
 
 OpNode::OpNode(config::CompoundConfigNode config): Node(Node::Op) {

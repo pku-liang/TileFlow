@@ -18,7 +18,7 @@ export TILEFLOW_BASE=$(pwd)
 # build timeloop
 cd 3rdparty/
 git clone git@github.com:gulang2019/timeloop.git
-cd timeloop
+cd timeloop/src
 ln -s ../pat-public/src/pat .
 cd ..
 scons --accelergy -j4 --static [--d] # --d for debug build
