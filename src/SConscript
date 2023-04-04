@@ -97,6 +97,7 @@ lib_sources = Split("""
 ./mapping/mapping.cpp
 ./loop-analysis/nest-analysis.cpp
 ./loop-analysis/memory-state.cpp
+./loop-analysis/dm-calculator.cpp
 ./model/topology.cpp
 """)
 

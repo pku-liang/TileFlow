@@ -254,6 +254,7 @@ void ScopeNode::display(std::string prefix, bool recursive) const{
             child->display(prefix + "  ");
         std::cout << prefix << "}" << std::endl;
     }
+    else std::cout << std::endl;
 }
 
 void OpNode::display(std::string prefix, bool) const {

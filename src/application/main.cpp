@@ -79,13 +79,9 @@ int main(int argc, char* argv[])
   std::cout << "Begin Spec..." << std::endl; 
   topology_.Spec(arch_specs_.topology);
 
-  analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_);
+  analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_, topology_);
   analysis.analyze();
   analysis.Print();
-
-  std::cout << "Begin eval..." << std::endl; 
-
-  topology_.eval(mapping, analysis);
 
   std::cout << "Parser check passed!" << std::endl;
 

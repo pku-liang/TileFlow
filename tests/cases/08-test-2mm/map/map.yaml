@@ -17,21 +17,17 @@ mapping:
         permutation: ML 
         target: MainMemory
         
-        subtree:
-        - node-type: Scope 
-          type: Sequential 
-
-          subtree: 
-          - node-type: Tile 
-            type: temporal  
-            factors: M=4 L=4 K=64
-            permutation: MLK 
-            target: RegFile
-            
-            subtree:
-            - node-type: Op
-              name: GEMM1 
-              binding: M:M L:L K:K 
+        subtree: 
+        - node-type: Tile 
+          type: temporal  
+          factors: M=4 L=4 K=64
+          permutation: MLK 
+          target: RegFile
+          
+          subtree:
+          - node-type: Op
+            name: GEMM1 
+            binding: M:M L:L K:K 
 
       - node-type: Scope 
         type: Sequential 
