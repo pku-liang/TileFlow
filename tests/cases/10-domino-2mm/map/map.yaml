@@ -1,0 +1,56 @@
+mapping:
+  node-type: Tile
+  type: Temporal
+  factors: M=32 L=32
+  permutation: ML
+  target: L1
+
+  subtree:
+    - node-type: Scope
+      type: Sequential
+
+      subtree:
+        - node-type: Tile
+          type: Temporal
+          factors: K=4
+          permutation: K
+          target: L1
+
+          subtree:
+            - node-type: Tile
+              type: Temporal
+              factors: M=16 L=16 K=16
+              permutation: MLK
+              target: L0
+
+              subtree:
+                - node-type: Op
+                  name: ProduceC
+                  binding: M:M L:L K:K
+        - node-type: Tile
+          type: Temporal
+          factors: M=16 L=16
+          permutation: ML
+          target: L0
+
+          subtree:
+            - node-type: Op
+              name: ProduceD
+              binding: M:M L:L
+        - node-type: Tile
+          type: Temporal
+          factors: N=4
+          permutation: N
+          target: L1
+
+          subtree:
+            - node-type: Tile
+              type: Temporal
+              factors: M=16 N=16 L=16
+              permutation: MNL
+              target: L0
+
+              subtree:
+                - node-type: Op
+                  name: ProduceF
+                  binding: M:M L:L N:N

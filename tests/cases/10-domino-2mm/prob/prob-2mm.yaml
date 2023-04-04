@@ -1,0 +1,65 @@
+problem:
+  io:
+    ins: A, B, E
+    outs: F
+  dimensions: [M,N,K,L]
+  instance:
+    M: 512
+    N: 64
+    K: 64
+    L: 512
+
+  ops:
+  - name: PoduceC
+    dimensions: [M,L,K] 
+    data-spaces:
+    - name: C 
+      projection:
+        - [[M]] 
+        - [[L]] 
+      read-write: True 
+    - name: A 
+      projection:
+        - [[M]]
+        - [[K]]
+    - name: B
+      projection:
+        - [[K]]
+        - [[L]]
+    ins: A, B
+    out: C
+   
+  - name: ProduceD
+    dimensions: [M,L]
+    type: exp 
+    data-spaces:
+    - name: C
+      projection:
+        - [[M]]
+        - [[L]]
+    - name: D
+      projection: 
+        - [[M]]
+        - [[L]]
+    ins: C
+    out: D
+    inplace: True
+    
+  - name: ProduceF
+    dimensions: [M,L,N]
+    data-spaces:
+    - name: F 
+      projection: 
+        - [[M]]
+        - [[N]]
+      read-write: True 
+    - name: D
+      projection: 
+        - [[M]]
+        - [[L]]
+    - name: E 
+      projection: 
+        - [[L]]
+        - [[N]]
+    ins: D, E
+    out: F
