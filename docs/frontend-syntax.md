@@ -4,48 +4,54 @@ TileFlow uses yaml for input configuration. There are 3 required fields for an  
 
 ## Arch File 
 
-The `architecture` field uses the syntax of `Timeloop`. The memory hierarchy is described in a recursive style from the outermost level (Main Memory) to the innermost level (ALU). Every level has following subfields:
-- name (required) -> string: a unique tag for the level. If there are multiple instances, uses NAME[0..N] in the name field. For example, PE[0..15] is used to describe a memory level with 16 PE cores.
-- class (optional) -> string: [DRAM|SRAM|regfile]
-- local: the local memory level;
-- subtree: a list of sub memory/ALU units. 
-- attributes: describe memory-related features. Useful ones (details in `3rdparty/timeloop/src/model/buffer.cpp::model::ParseSpecs`):
-    - width: the number of bits in memory; (width = depth * block-size * word-bits)
-    - depth: the number of blocks in a memory;
-    - block-size: the number of word in a block;
-    - word-bits: the word size in bits;
-    - read_bandwidth: word/cycle?
-    - write_bandwidth: word/cycle?
+The `architecture` field uses the syntax of `Timeloop`, see [this](https://timeloop.csail.mit.edu/timeloop/input-formats/design/architecture) for description. 
 
 ## Prob File 
 
-The `problem` field describes the workload as a function. There are some required sub-filedsL:
+The `problem` field extends `Timeloop`'s syntax to support multi-op. The file is organized like:
+```
+problem:
+    io:
+        ...
+    dimensions:
+        ...
+    instance:
+        ...
+    ops:    
+    - TIMELOOP-OP1
+    - TIMELOOP-OP2
+    ... 
+```
+
 - `io`: the input and output of the function.
-- `dimensions`: all the dimensions appear in describing the tensors. 
-- `instance`: the problem size for each dimension. 
-- `ops`: a list of operations.
-
-For `ops` field, the user need to specify the unique `name` for every operation, the `dimensions` used for every operation, and the access patterns `data-spaces` for every tensors. For the data-space, the user specify the tensor name in `name` and the access pattern in `projection`. For `projection`, the syntax is Product of Sum of Product. For example, T[A+B*2][C] is described as 
-
-```
-projection: 
-    - [[A], [B,2]]
-    - [C]
-```
-
- A read-write tensor is marked manually by a flag `read-write`. Also, for each `op` the user needs to specify the `ins` field for input tensor and `out` field for a single output tensor. This information is used for def-use analysis. 
+- `dimensions`: all the dimensions appeared in describing the tensors. 
+- `instance`: the specification for parameters, see [this](https://timeloop.csail.mit.edu/timeloop/input-formats/problem#problem-shape) for description. 
+- `ops`: a list of tensor operations, follow the same syntax with [shape](https://timeloop.csail.mit.edu/timeloop/input-formats/problem#problem-shape) in timeloop without the instance field. An extra field of each op is the `ins` and `out` field to specify the IO of each operation.
 
 ## Mapping File 
 
-The `mapping` field decribed the mapping in a hierarchical tree. The children of every node in the tree is a list under the subfield `subtree`. There are three kinds of nodes in the tree (specified in `node-type`): 
+The `mapping` field decribed the mapping in a tree. A Node in a tree is like:
 
-- Scope Node: to specify the boundary of memory hierarchy; The only attribute of a scope node is its sub-types: Sharing/Temporal/Spatial/Pipeline (specified in `type`).  
+```yaml
+node-type: TILE|Scope|Op
+# optional attributes
+type: [Sharing|Temporal|Spatial|Pipeline|temporal|spatial]
+factors:
+permutation:
+target:
+split: 
 
-- Tile Node: to specify the temporal/spatial mapping of loops. Attributes:
-    - type: spatial/temporal;
-    - permutation: A permutation of iterations; from inner to outer. 
-    - target: A memory level name; 
-    - factors: dimension name -> int. 
+subtree:   
+- CHILD1
+- CHILD2
+...
+```
+
+There are three kinds of nodes:
+
+- Scope Node: to specify the boundary of memory hierarchy; The only attribute of a scope node is its sub-types: Sharing/Temporal/Spatial/Pipeline.  
+
+- Tile Node: to specify the temporal/spatial mapping of loops. The key attributes include factors, permutations, target, split, etc.. See [this](https://timeloop.csail.mit.edu/timeloop/input-formats/mapping) for illustration.
 
 - Op Node: to specify the arithmetic operations; Attributes:
     - name: the name of operation;
