@@ -44,6 +44,7 @@ namespace analysis
 
         void NestAnalysis::analyze()
         {
+            sanity_check();
             get_loopnest();
             get_dimscale();
             get_active_tensors();
@@ -51,6 +52,11 @@ namespace analysis
             get_spatial_offsets();
             get_expansion();
             get_datamovement();
+        }
+
+        void NestAnalysis::sanity_check() {
+            SanityChecker pass(*this);
+            pass.run(mapping_.root);
         }
 
         void NestAnalysis::get_storage_level() {
@@ -328,14 +334,11 @@ namespace analysis
 
         void StorageLevelCalculator::visitScope(const ScopeNode* node) {
             auto& config = analysis_.configs[node];
-            auto& storage_level = config.storage_level = -1;
+            auto& storage_level = config.storage_level = 0;
             for (auto child: node->get_children()) {
                 child->accept(this);
                 assert(!storage_levels_.empty());
-                if (storage_level == (unsigned)-1) {
-                    storage_level = storage_levels_.top();
-                }
-                else assert(storage_level == storage_levels_.top());
+                storage_level = std::max(storage_level, storage_levels_.top());
                 storage_levels_.pop();
             }
             config.fanout_x = analysis_.mapping_.fanoutX_map.at(config.storage_level);
@@ -1277,7 +1280,61 @@ namespace analysis
             }
         }
 
+        void SanityChecker::run(const Node* root){
+            for (auto& kv: problem::GetShape()->FactorizedDimensionIDToName)
+                scales_[kv.first] = 1;
+            storage_level_ = analysis_.arch_specs_.topology.NumStorageLevels();
+            root->accept(this);
+        }
 
+        void SanityChecker::visitTile(const TileNode* node){
+            auto old_scales = scales_;
+            auto old_storage_level = storage_level_;
+            TILEFLOW_ASSERT(node->get_tile_type() != TileNode::Temporal ||
+                node->get_storage_level() == (--storage_level_), 
+                "duplicate temporal tile for storage level " << node->get_storage_name()
+                << "," << node->get_storage_level() << ":" << storage_level_);
+            for(auto loop: node->get_loops()) {
+                scales_[loop.dimension] *= 1 + ((loop.end - 1 - loop.start) /
+                                           loop.stride);    
+            }
+            auto& children = node->get_children();
+            TILEFLOW_ASSERT(children.size() == 1, "Tile node should have at only child.");
+            auto child = children.front();
+            child->accept(this);
+            scales_ = old_scales;
+            storage_level_ = old_storage_level;
+
+
+            if (node->get_tile_type() == TileNode::Spatial){
+                TILEFLOW_ASSERT(child->get_type() == Node::Tile, 
+                "Spatial's child must be temporal tile.");
+                TILEFLOW_ASSERT(static_cast<const TileNode*>(child)->get_tile_type() == TileNode::Temporal, 
+                "Spatial's child must be temporal tile.");
+            }
+
+        }
+        
+        void SanityChecker::visitScope(const ScopeNode* node){
+            auto& children = node->get_children();
+            TILEFLOW_ASSERT(children.size() > 1, "Scope node should have more than one child.");
+            for (auto child: children) child->accept(this);
+        }
+
+        void SanityChecker::visitOp(const OpNode* node) {
+            auto& workload = analysis_.common_workload_;
+            for(auto& kv: node->get_workload()->GetShape()->FactorizedDimensionNameToID){
+                int dim = problem::GetShape()->FactorizedDimensionNameToID.at(kv.first);
+                auto scale = scales_.at(dim);
+                int scale_ = workload.GetFactorizedBound(dim);
+                TILEFLOW_ASSERT(scale == scale_, 
+                    "Mapping/Instance mimatch for dim " << kv.first << 
+                    ": " << scale << "!=" << scale_ 
+                     << " for " << kv.first);
+            }
+            TILEFLOW_ASSERT(storage_level_ == 0, 
+            " missing temporal tiles for storage level under " << storage_level_);
+        } 
 
     } // namespace TileFlow
 

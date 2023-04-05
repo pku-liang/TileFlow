@@ -10,7 +10,7 @@ problem:
     L: 512
 
   ops:
-  - name: PoduceC
+  - name: ProduceC
     dimensions: [M,L,K] 
     data-spaces:
     - name: C 

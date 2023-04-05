@@ -17,18 +17,15 @@ class Node;
 class ScopeNode;
 class TileNode;
 class OpNode;
-class CollectNode;
 
 class Visitor {
 protected:
     virtual void visitScope(const ScopeNode*);
     virtual void visitTile(const TileNode*);
     virtual void visitOp(const OpNode*);
-    virtual void visitCollect(const CollectNode*);
     friend class TileNode;
     friend class ScopeNode;
     friend class OpNode;
-    friend class CollectNode;
 public:
     virtual void run (const Node*);
 };
@@ -38,8 +35,7 @@ public:
     enum type_t{
         Tile,
         Op,
-        Scope,
-        Collect 
+        Scope
     };
 protected:
     Node::type_t type_;
@@ -110,8 +106,7 @@ public:
     bool is_spatial() const {return type_ == Spatial;}
     TileNode::type_t get_tile_type() const {return type_;}
     
-    loop::Nest constructLoopNest(
-        const std::map<std::string, problem::Shape::FactorizedDimensionID>&) const;
+    loop::Nest constructLoopNest() const;
     size_t n_level() const {return loopnests_.size();}
     const std::vector<loop::TileFlow::Descriptor>& get_loops() const {return loopnests_;}
 };
@@ -126,16 +121,10 @@ public:
     OpNode(config::CompoundConfigNode config);
     void display(std::string prefix, bool recursive) const override;
     const std::string & get_name() const {return name_;}
+    const std::unordered_map<std::string, std::string>& get_binding() const {return binding_;}
     void accept(Visitor* visitor) const {visitor->visitOp(this);}
     const std::shared_ptr<problem::TileFlow::Workload>& get_workload() const {return p_workload;}
 };
-
-class CollectNode: public Node {
-    unsigned storage_level_;
-    std::string storage_level_name_;
-public: 
-    void accept(Visitor* visitor) const {visitor->visitCollect(this);}
-}; // a placeholder node to provide 
 
 struct Mapping {
     std::map<unsigned, std::uint64_t> fanoutX_map;

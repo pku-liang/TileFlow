@@ -55,8 +55,6 @@ There are three kinds of nodes:
 
 - Op Node: to specify the arithmetic operations; Attributes:
     - name: the name of operation;
-    - binding: iteration-name-in-loop -> dimension-name-in-op 
-
 
 
 

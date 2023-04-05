@@ -5,6 +5,8 @@
 
 #include "loop-analysis/nest-analysis.hpp"
 #include "loop-analysis/loop-state.hpp"
+#include "model/topology.hpp"
+
 
 #include "tileflow/mapping/mapping.hpp"
 #include "tileflow/common.hpp"
@@ -15,7 +17,6 @@ using mapping::TileFlow::Node;
 using mapping::TileFlow::OpNode;
 using mapping::TileFlow::TileNode;
 using mapping::TileFlow::ScopeNode;
-using mapping::TileFlow::CollectNode;
 using mapping::TileFlow::Visitor;
 
 
@@ -26,7 +27,7 @@ namespace TileFlow {
     struct stat_t {
         problem::PerDataSpace<AccessStatMatrix> access_stat_;
         problem::PerDataSpace<size_t> max_size_;
-        problem::PerDataSpace<long> link_transfer_;
+        problem::PerDataSpace<std::uint64_t> link_transfer_;
         ComputeInfo compute_info_;
     };
 
@@ -52,20 +53,27 @@ namespace TileFlow {
         // SpatialOffsetsCalculator
         std::uint64_t spatial_offset_x, spatial_offset_y, logical_x, logical_y, logical_fanout;
         std::uint64_t replication_factor;
+        std::uint64_t max_x_expansion, max_y_expansion;
     };
 
     class NestAnalysis {
         const problem::TileFlow::Workloads& workloads_;
         const mapping::TileFlow::Mapping& mapping_;
         const model::Engine::Specs& arch_specs_;
-
+        const model::Topology& topology_;
         const problem::Workload& common_workload_;
+
+        std::uint64_t cycle_;
         
         void add_access_pattern(
             problem::Shape::DataSpaceID producer_id, 
             const Node* producer, 
             problem::Shape::DataSpaceID consumer_id,
             const Node* consumer);
+        /**
+         * \brief sanity check
+        */
+       inline void sanity_check();
         /**
          * \brief set the loopnest for tile nodes;
         */
@@ -95,6 +103,11 @@ namespace TileFlow {
         void get_spatial_offsets();
 
         /**
+         * \brief compute maximum expansion 
+        */
+        void get_expansion();
+
+        /**
          * \brief Aggregate Datamovement/compute info
         */
         void collect_info();
@@ -105,9 +118,10 @@ namespace TileFlow {
         std::unordered_map<const Node*, tiling::CompoundTile> tiles_; 
 
     public: 
-        NestAnalysis(problem::TileFlow::Workloads& workloads_, 
-            mapping::TileFlow::Mapping& mapping_, 
-            model::Engine::Specs& arch_specs_);
+        NestAnalysis(const problem::TileFlow::Workloads& workloads_, 
+            const mapping::TileFlow::Mapping& mapping_, 
+            const model::Engine::Specs& arch_specs_, 
+            const model::Topology& topology_);
         
         const tiling::CompoundTile& get_tile(const Node* node) const 
             {
@@ -127,8 +141,8 @@ namespace TileFlow {
         friend class PerfectLoopnestAnalyzer;
         friend class StorageLevelCalculator;
         friend class SpatialOffsetsCalculator;
-        friend class TileStatGenerator;
         friend class ComputeExpansion;
+        friend class SanityChecker;
     };
 
     /**
@@ -145,11 +159,30 @@ namespace TileFlow {
 
     std::ostream& operator<< (std::ostream& o, const InputParam& params);
 
-    struct RetVal{
-        MemoryState deltas_;
-        MemoryState last_working_set_;
-        tiling::CompoundTile tile_;
 
+    /**
+     *                      Temporal        [Spatial]       Collect
+     * Tile              new; Read/Write   Fill/Link  Eval -> time = max(read, fill, update)
+     * Delta/LastState        new          expand         forward
+     * Time                   forward       forward       eval;new 
+    */
+   /**
+    * Sequential: Child -> Sigma_child max(read/write/fill) 
+    * Pipeline: time = maxs(max(read/write/update))
+    * Parallel: time = max(max(read/write/update))
+   */
+
+    struct RetVal{
+        // Ret as the delta between temporal tiles
+        MemoryState deltas_;
+        // Always a ret value
+        MemoryState last_working_set_;
+        // Ret between Tile node and CollectNode;
+        std::shared_ptr<tiling::CompoundTile> p_tile_;
+
+        // Ret between CollectNode and parent; 
+        problem::PerDataSpace<AccessStatMatrix> access_stat_;
+        std::uint64_t cycle_ = 0;
 
         RetVal() {}
         RetVal(const problem::OperationPoint& low_pt, 
@@ -165,24 +198,10 @@ namespace TileFlow {
 
     std::ostream& operator<< (std::ostream& o, const RetVal& params);
 
-    class TileStatGenerator {
-        NestAnalysis& analysis_;     
-        void ComputeParentShareAccess(tiling::CompoundTile& tile);
-        void ComputePeerAccesses(tiling::CompoundTile& tile);
-        void ComputeReadUpdate(tiling::CompoundTile& tile);
-        void ComputeFill(tiling::CompoundTile& tile);
-        void ComputeDensityModels(tiling::CompoundTile& tile);
-        
-    public: 
-        TileStatGenerator(NestAnalysis& analysis): analysis_(analysis) {}
-        void visitTile(const TileNode*, tiling::CompoundTile& tile);
-        void visitOp(const OpNode*, tiling::CompoundTile& tile);
-    };
-
     class DatamovementCalculator: public mapping::TileFlow::Visitor {
         NestAnalysis& analysis_;
         const problem::Workload& workload_;
-        TileStatGenerator tile_generator_;
+        const model::Topology & topology_;
         /**
          * \brief the stack to pass parameter between nodes.
         */
@@ -190,18 +209,20 @@ namespace TileFlow {
         std::stack<RetVal> ret_stack_;
         // const Node* curr_node_;
         RetVal computeDelta(const InputParam& input);
+        void finalizeStat(const Node* node, RetVal& ret);
         
         void visitTile(const TileNode*) override;
         void visitScope(const ScopeNode*) override;
         void visitOp(const OpNode*) override;
-        void visitCollect(const CollectNode*) override; 
+
+        bool break_on_failure;
     
     public:
         DatamovementCalculator(NestAnalysis& analysis): 
             analysis_(analysis), workload_(analysis_.common_workload_),
-            TileStatGenerator(analysis){}
+            topology_(analysis.topology_){}
         
-        void run(const Node*) override;
+        RetVal eval(const Node*);
         friend class PerfectLoopnestAnalyzer;
     };
 
@@ -211,7 +232,8 @@ namespace TileFlow {
         NodeConfig& config_;
         RetVal ComputeTemporalWorkingSet();
         RetVal ComputeSpatialWorkingSet();
-        void SimulateTemporalExecution();
+        int SimulateTemporalExecution(
+            problem::PerDataSpace<AccessStatMatrix>& access_stat);
         void InitPerLevelDimScales() override;
         void InitStorageBoundaries() override;
         virtual problem::PerDataSpace<Point> GetCurrentTranslationVectors(
@@ -226,23 +248,53 @@ namespace TileFlow {
             bool at_boundary);
 
         std::uint64_t SpatialIDL2P(std::uint64_t logical_id);
-        problem::PerDataSpace<AccessStatMatrix> ComputeAccessStat(
+
+        bool singleton = true;
+        
+        // utils for compute link transfers;
+
+        void ComputeStats(
             const MemoryState& last_working_set,
-            const MemoryState& delta 
+            const MemoryState& deltas,
+            problem::PerDataSpace<AccessStatMatrix>& access_stats, 
+            problem::PerDataSpace<std::uint64_t>& link_transfers
         );
+
         void ComputeLinkTransfer(
             const MemoryState& last_working_set, 
             const MemoryState& delta,
-            problem::PerDataSpace<std::unordered_set<std::uint64_t>>& unaccounted_delta,
-            problem::PerDataSpace<std::size_t>& link_transfers
+            problem::PerDataSpace<std::uint64_t>& link_transfers,
+            problem::PerDataSpace<std::unordered_set<std::uint64_t>>& unaccounted_delta  
         );
 
         void ComputeAccessStat(
             const MemoryState& delta, 
             problem::PerDataSpace<std::unordered_set<std::uint64_t>>& unaccounted_delta, 
             problem::PerDataSpace<AccessStatMatrix>& access_stat,
-            bool enable_multicast = true 
+            bool enable_multicast = true
         );
+
+        void ComputePeerAccesses(
+            const problem::PerDataSpace<std::uint64_t>& link_transfer,
+            tiling::CompoundTile& tile);
+
+        void InitTile(
+            const problem::PerDataSpace<AccessStatMatrix>& access_stat,
+            tiling::CompoundTile& tile
+        );
+
+        void ComputeParentShareAccess(
+            const problem::PerDataSpace<AccessStatMatrix>& access_stats,
+            tiling::CompoundTile& tile
+        );
+        void ComputeFill(tiling::CompoundTile& tile);
+
+        void FinalizeTile(tiling::CompoundTile& tile);
+
+        void ComputeReadUpdate(tiling::CompoundTile& tile);
+
+        void ComputeDensityModels(tiling::CompoundTile& tile);
+
     public: 
         PerfectLoopnestAnalyzer(
             DatamovementCalculator& dm,
@@ -304,8 +356,7 @@ namespace TileFlow {
 
     class LoopNestConstructor: public mapping::TileFlow::Visitor {
         void visitTile(const TileNode* node) override { 
-            analysis_.configs[node].loop_nest = node->constructLoopNest(
-                analysis_.workloads_.get_shape().FactorizedDimensionNameToID);
+            analysis_.configs[node].loop_nest = node->constructLoopNest();
             for (auto child: node->get_children()) {child->accept(this);}
         }
         NestAnalysis& analysis_;
@@ -321,7 +372,36 @@ namespace TileFlow {
         NestAnalysis& analysis_;
     public: 
         StorageLevelCalculator(NestAnalysis& analysis): analysis_(analysis){
+            if (verbose_level) {
+                std::cout << "Begin storge level calculation..." << std::endl;
+                std::cout << "\tfanoutX: ";
+                for (auto& kv: analysis_.mapping_.fanoutX_map)
+                    std::cout << kv.first << ":" << kv.second << ",";
+                std::cout << std::endl;
+                std::cout << "\tfanoutY: ";
+                for (auto& kv: analysis_.mapping_.fanoutY_map)
+                    std::cout << kv.first << ":" << kv.second << ",";
+                std::cout << std::endl;
+                
+            }
         }
+    };
+
+    /**
+     * rule1: Tiling fators's multiplication should be equal to the shape;
+     * rule2: Spatial TileNode's child must be a Temporal Tile Node
+     * rule3: each level should have at most one temporal tile node;
+    */
+    class SanityChecker: public mapping::TileFlow::Visitor {
+        std::unordered_map<int, int> scales_;
+        unsigned storage_level_;
+        void visitTile(const TileNode*) override;
+        void visitScope(const ScopeNode*) override;
+        void visitOp(const OpNode*) override; 
+        NestAnalysis& analysis_;
+    public: 
+        SanityChecker(NestAnalysis& analysis_): analysis_(analysis_){}
+        void run(const Node*) override; 
     };
 
     class SpatialOffsetsCalculator: public mapping::TileFlow::Visitor {

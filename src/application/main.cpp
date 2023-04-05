@@ -65,14 +65,14 @@ int main(int argc, char* argv[])
 
   std::cout << "Begin ParseWorkload..." << std::endl;
   problem::TileFlow::ParseWorkloads(problem, workloads);
+  problem::Workload::SetCurrShape(&workloads.get_shape());
+
+  workloads.Print();
 
   auto mapping = mapping::TileFlow::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
   
   mapping.Print();
-  
-  workloads.Print();
 
-  problem::Workload::SetCurrShape(&workloads.get_shape());
 
   model::TileFlow::Topology topology_;
 

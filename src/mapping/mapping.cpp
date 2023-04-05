@@ -23,13 +23,11 @@ void Visitor::run(const Node* root) {
     root->accept(this);
 }
 
-loop::Nest TileNode::constructLoopNest(
-    const std::map<std::string, problem::Shape::FactorizedDimensionID> & name2id) const{
+loop::Nest TileNode::constructLoopNest() const{
     loop::Nest loop_nest;
     uint64_t num_subnests_added = 0;
     for (auto loop: loopnests_)
     {
-        loop.dimension = name2id.at(loop.name_);
         // Ignore trivial factors
         // This reduces computation time by 1.5x on average.
         if (loop.start + loop.stride < loop.end){

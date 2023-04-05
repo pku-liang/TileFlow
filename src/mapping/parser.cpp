@@ -35,7 +35,7 @@ ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope){
 TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
     std::string type_s = "temporal";
     config.lookupValue("type", type_s);
-    tolower(type_s);    
+    tolower(type_s);
     if (type_s.find("temp") != std::string::npos) {
         type_ = Temporal;
     }
@@ -74,6 +74,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
         loopnests_.emplace_back();
         loop::TileFlow::Descriptor& loop = loopnests_.back();
         loop.name_ = iters[i];
+        loop.dimension = problem::GetShape()->FactorizedDimensionNameToID.at(loop.name_);
         loop.start = 0;
         loop.end = loop_bounds[iters[i]].first;
         loop.residual_end = loop_bounds[iters[i]].second;
@@ -168,23 +169,6 @@ void Node::ParseStorageLevel(config::CompoundConfigNode directive)
 OpNode::OpNode(config::CompoundConfigNode config): Node(Node::Op) {
     assert(config.lookupValue("name", name_));
     p_workload = p_workloads_->get_workload(name_);
-
-    std::string str;
-    assert(config.lookupValue("binding", str));
-    std::regex re("([A-Za-z])[[:space:]]*[:][[:space:]]*([A-Za-z])", std::regex::extended);
-    std::smatch sm;
-
-    while (std::regex_search(str, sm, re))
-    {
-        std::string iter_name = sm[1];
-
-        std::string dim_name = sm[2];
-
-        binding_[dim_name] = iter_name;
-
-        str = sm.suffix().str();
-    }
-    p_workload->apply_binding(binding_);
 }
 
 

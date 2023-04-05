@@ -121,6 +121,9 @@ std::string ParseWorkload(config::CompoundConfigNode config, problem::TileFlow::
   }
   workload.SetDensities(densities);
 
+  // 3) set common shape
+  workload.set_common_shape();
+
   return name;
 }
 
@@ -210,6 +213,7 @@ bool Workloads::add_workload(const std::string & name, std::shared_ptr<Workload>
   }
 
   workloads_[name] = std::move(workload);
+  
   return true;
 }
 
@@ -275,14 +279,11 @@ void Workload::Print() {
   std::cout << ")->" << out_ << std::endl;
 }
 
-void Workload::apply_binding(const std::unordered_map<std::string, std::string>& binding) {
-  if (binding_applied) 
-    return;
+void Workload::set_common_shape() {
   auto& common_shape_ = workloads_.common_shape_;
   
   for (auto& kv: shape_.FactorizedDimensionNameToID){
-    TILEFLOW_ASSERT(binding.count(kv.first), kv.first << " of op " << name_ << " is not bond to any runtime iteration.");
-    std::string iter = binding.at(kv.first);
+    std::string iter = kv.first;
     if (!common_shape_.FactorizedDimensionNameToID.count(iter)){
       problem::Shape::FactorizedDimensionID factorized_id = common_shape_.NumFactorizedDimensions;
       assert(!common_shape_.FactorizedToFlattened.count(factorized_id));
@@ -307,7 +308,7 @@ void Workload::apply_binding(const std::unordered_map<std::string, std::string>&
       for (auto& term: expr) {
         Shape::CoefficientID new_coeff_id = term.first == shape_.NumCoefficients? -1:
         common_shape_.CoefficientNameToID[shape_.CoefficientIDToName[term.first]];
-        Shape::FactorizedDimensionID new_factorized_dim = common_shape_.FactorizedDimensionNameToID[binding.at(shape_.FactorizedDimensionIDToName[term.second])];
+        Shape::FactorizedDimensionID new_factorized_dim = common_shape_.FactorizedDimensionNameToID[shape_.FactorizedDimensionIDToName[term.second]];
         new_expr.emplace_back(new_coeff_id, new_factorized_dim);
       }
     }
@@ -315,7 +316,6 @@ void Workload::apply_binding(const std::unordered_map<std::string, std::string>&
 
   // provide a walk around; 
   common_shape_.DefaultCoefficients[-1] = 1;
-  binding_applied = true;
 }
 
 void Workloads::set_factorized_bound(const std::string& dim, int bound) {

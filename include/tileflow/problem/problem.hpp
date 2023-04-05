@@ -26,9 +26,10 @@ namespace TileFlow {
         inline const std::vector<std::string>& get_ins() const { return ins_; }
         inline const std::string & get_out() const {return out_;}
         inline const std::string & get_name() const {return name_;} 
+        inline const problem::Workload::FactorizedBounds& get_factorized_bounds() {return factorized_bounds_;}
         void Print();
         friend class Workloads;
-        void apply_binding(const std::unordered_map<std::string, std::string>& binding);
+        void set_common_shape();
     };
 
     class Workloads{
@@ -50,6 +51,7 @@ namespace TileFlow {
         Workloads() {common_shape_.UsesFlattening = false; coefficients_[-1] = 1;}
         bool add_workload(const std::string& name, std::shared_ptr<problem::TileFlow::Workload>& workload);
         std::shared_ptr<problem::TileFlow::Workload> get_workload(const std::string & op_name) const {
+            TILEFLOW_ASSERT(workloads_.count(op_name), op_name << " Not FOUND");
             return workloads_.at(op_name);
         }
         void set_io(const std::vector<std::string>& ins, const std::vector<std::string>& outs);

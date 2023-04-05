@@ -11,7 +11,7 @@ mapping:
 
       subtree:
         - node-type: Tile
-          type: Temporal
+          type: Spatial
           factors: K=4
           permutation: K
           target: L1
@@ -38,7 +38,7 @@ mapping:
               name: ProduceD
               binding: M:M L:L
         - node-type: Tile
-          type: Temporal
+          type: Spatial
           factors: N=4
           permutation: N
           target: L1
