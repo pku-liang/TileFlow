@@ -78,7 +78,8 @@ namespace analysis
         {
             DatamovementCalculator dm(*this);
             RetVal ret = dm.eval(mapping_.root);
-            cycle_ = ret.cycle_;
+            cycle_ = ret.cycle_ + topology_.total_network_latency_;
+            energy_ = dm.Energy();
         }
 
         void NestAnalysis::get_active_tensors()
@@ -186,8 +187,18 @@ namespace analysis
         {
             std::cout << "-----------------Nest Analysis----------------" << std::endl;
             Displayer(*this).display();
-            std::cout << "Cycle: " << cycle_ << std::endl;
+            std::cout << "Cycle: " << cycle_
+                    << ", Energy: " << energy_
+                     << std::endl;
             std::cout << "--------------END Nest Analysis---------------" << std::endl;
+        }
+
+        void NestAnalysis::Report() {
+            std::cout << "***TileFlow Result" << std::endl;
+            std::cout << ",value" << std::endl;
+            std::cout << "Cycle," << cycle_ << std::endl;
+            std::cout << "Energy," << energy_ << std::endl;
+            std::cout << "***TileFlow Result Ends" << std::endl;
         }
 
         void Displayer::visitTile(const TileNode *node)
@@ -206,7 +217,7 @@ namespace analysis
                 for (auto id : config.active_fill_tensors)
                     std::cout << shape.DataSpaceIDToName.at(id) << ",";
                 std::cout << std::endl;
-                std::cout << prefix_ << "storage:" << analysis_.arch_specs_.topology.LevelNames()[config.storage_level];
+                std::cout << prefix_ << "storage:" << node->get_storage_name();
                 std::cout << ", fanout:" << config.fanout_x << "," << config.fanout_y << std::endl;
                 std::cout << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
                 std::cout << prefix_ << "l-fanout" << config.logical_x << "," << config.logical_y << std::endl;
@@ -388,7 +399,7 @@ namespace analysis
                     input_offsets.push(init_offset);
                     child->accept(this);
                     assert(!output_offsets.empty());
-                    output_offset = merge(output_offset, output_offsets.top());
+                    init_offset = merge(output_offset, output_offsets.top());
                     output_offsets.pop();
                 }
             }
@@ -430,6 +441,13 @@ namespace analysis
                 output_offset.y = config.logical_y;
                 output_offset.max_x = output_offset.x + config.logical_x; 
             }
+            // std::cout << "===========Offset Calculation=========" << std::endl;
+            // std::cout << "Node:" << std::endl;
+            // node->display("\t", false);
+            // std::cout << "input:" << init_offset << std::endl;
+            // std::cout << "output: " << output_offset << std::endl;
+            // std::cout << "fanout: " << config.fanout_x << "," << config.fanout_y << std::endl;
+            // std::cout << "======================================" << std::endl;
             assert(output_offset.y <= config.fanout_y);
             assert(output_offset.max_x <= config.fanout_x);
             output_offsets.push(output_offset);
@@ -449,6 +467,12 @@ namespace analysis
             config.replication_factor = replication_factor;
         }
 
+        std::ostream& operator << (std::ostream& o, 
+            const SpatialOffsetsCalculator::offset_t& offset){
+            o << "x,y,maxX:" << offset.x << "," << offset.y << "," << offset.max_x << ","; 
+            return o;
+        }
+
         std::ostream& operator<< (
             std::ostream& o, 
             const InputParam& input){
@@ -460,7 +484,9 @@ namespace analysis
             o << "s-stamp: ";
             for (auto x:input.space_stamp_) o << x << ",";
             o << std::endl;
-            o << "point:" << input.cur_transform_ << std::endl;
+            for (unsigned i = 0; i < input.cur_transform_.Order(); i++)
+                std::cout << problem::GetShape()->FactorizedDimensionIDToName.at(i);
+            o << ":" << input.cur_transform_ << std::endl;
             o << "init state:" << std::endl;
             input.init_working_set_.show();
             return o;
@@ -471,7 +497,7 @@ namespace analysis
             const RetVal& ret
         ) {
             o << "Ret:" << std::endl;
-            o << "\tDelats:";
+            o << "\tDeltas:"<<std::endl;
             ret.deltas_.show();
             o << "\tLastWorkingSet:" << std::endl;
             ret.last_working_set_.show();
@@ -556,7 +582,8 @@ namespace analysis
             }
 
             if (input_.num_epochs_ && (node->get_parent() == nullptr || 
-                node->get_parent()->get_type() != Node::Tile)) {
+                node->get_parent()->get_type() != Node::Tile || 
+                static_cast<const TileNode*>(node->get_parent())->get_tile_type() != TileNode::Spatial)) {
                 assert(ret_val.p_tile_ != nullptr);
                 ComputeParentShareAccess(ret_val.access_stat_, *ret_val.p_tile_);
                 ComputeFill(*ret_val.p_tile_);
@@ -782,6 +809,11 @@ namespace analysis
                               nest_state_.rbegin(), // extrapolation_level 
                               ret);  // the ret val
             if (input_.num_epochs_) {
+                // overwrite the fanout and replication factor
+                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; ++pv){
+                    auto& info = ret.p_tile_->data_movement_info[pv];
+                    info.fanout = config_.fanout_x * config_.fanout_y;
+                }
                 problem::PerDataSpace<std::uint64_t> link_transfers;
                 ComputeStats(input_.init_working_set_, 
                     ret.deltas_, ret.access_stat_, link_transfers);
@@ -1176,7 +1208,7 @@ namespace analysis
                 info.content_accesses = info.access_stats.TotalAccesses();
                 info.peer_accesses = 0;
                 info.peer_fills = 0;
-                info.replication_factor = config_.logical_x * config_.logical_y;
+                info.replication_factor = config_.replication_factor;
                 info.fanout = config_.fanout_x * config_.fanout_y; // is this correct?
                 info.SetTensorRepresentation();
                 info.max_x_expansion = config_.max_x_expansion;
@@ -1290,6 +1322,10 @@ namespace analysis
         void SanityChecker::visitTile(const TileNode* node){
             auto old_scales = scales_;
             auto old_storage_level = storage_level_;
+            TILEFLOW_ASSERT(node->get_tile_type() != TileNode::Spatial || 
+                node->get_storage_level() == storage_level_, 
+                "bad spatial tile level at " << node->get_storage_name() 
+                << ", should be the same with upper temporal node.");
             TILEFLOW_ASSERT(node->get_tile_type() != TileNode::Temporal ||
                 node->get_storage_level() == (--storage_level_), 
                 "duplicate temporal tile for storage level " << node->get_storage_name()

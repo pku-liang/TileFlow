@@ -10,6 +10,7 @@ namespace analysis
         RetVal DatamovementCalculator::eval(const Node *root)
         {
             break_on_failure = false;
+            energy_ = 0.0;
             MemoryState::set_workload(&workload_);
             InputParam input;
             input.num_epochs_ = 1;
@@ -32,6 +33,11 @@ namespace analysis
             input_stack_.pop();
             // Add a mask here.
             RetVal ret;
+            if (input.num_epochs_ == 0) {
+                ret_stack_.push(ret);
+                return;
+            }
+
             auto &active_tensors = analysis_.configs.at(node).active_read_tensors;
             problem::OperationSpace point_set(MemoryState::workload_,
                                               input.cur_transform_, input.cur_transform_); // A single point
@@ -40,7 +46,7 @@ namespace analysis
                 if (find(active_tensors.begin(), active_tensors.end(), pv) == active_tensors.end())
                     point_set.GetDataSpace(pv).Reset();
                 else {
-                    ret.access_stat_[pv](1,1).accesses = point_set.GetSize(pv);
+                    ret.access_stat_[pv](1,1).accesses = point_set.GetSize(pv) * input.num_epochs_;
                 }
             }
             ret.last_working_set_.insert(0, point_set);
@@ -75,9 +81,16 @@ namespace analysis
                 mask[pv] = true;
             auto level = topology_.GetArithmeticLevel()->Clone();
             level->Evaluate(tile, mask, 0, tile.compute_info.accesses, break_on_failure);
-            
             ret.cycle_ = level->Cycles();
+            energy_ += level->Energy();
             ret_stack_.push(ret);
+            
+            std::cout << "========BEG Compute Stat=========" << std::endl;
+            std::cout << input;
+            std::cout << ret;
+            level->Print(std::cout);
+            std::cout << "========END Compute Stat=========" << std::endl;
+
         }
 
         void DatamovementCalculator::visitTile(const TileNode *node)
@@ -88,9 +101,15 @@ namespace analysis
             auto &config = analysis_.configs[node];
             analyzer.init(&analysis_.common_workload_, &config.loop_nest);
             auto ret = analyzer.calculateDataMovement();
+            // if current node is root or its parent is of another storage level 
+            // we finalize the stat 
             if (input.num_epochs_ && (node->get_parent() == nullptr || 
-                node->get_parent()->get_type() != Node::Tile))
-                finalizeStat(node, ret);
+                node->get_parent()->get_type() != Node::Tile || 
+                static_cast<const TileNode*>(node->get_parent())->get_tile_type() != TileNode::Spatial)){
+                finalizeStat(node->is_spatial()? 
+                    node->get_children().front()->get_storage_level():node->get_storage_level(),
+                     ret);
+            }
             ret_stack_.push(ret);
         }
 
@@ -144,8 +163,7 @@ namespace analysis
             return ret;
         }
 
-        void DatamovementCalculator::finalizeStat(const Node* node, RetVal& ret) {
-            auto storage_id = node->get_storage_level();
+        void DatamovementCalculator::finalizeStat(unsigned storage_id, RetVal& ret) {
             auto storage_level = std::static_pointer_cast<model::BufferLevel>(
                 topology_.GetStorageLevel(storage_id)->Clone());
             tiling::CompoundMask mask = {};
@@ -156,6 +174,7 @@ namespace analysis
                 ret.cycle_, break_on_failure);
             storage_level->FinalizeBufferEnergy();
             ret.cycle_ = storage_level->Cycles();
+            energy_ += storage_level->Energy();
 
             auto connection = topology_.connection_map_.at(storage_id);
             auto rf_net = connection.read_fill_network->Clone();
@@ -163,14 +182,21 @@ namespace analysis
             auto du_net = connection.drain_update_network->Clone();
             du_net->Evaluate(*ret.p_tile_, break_on_failure);
             assert(ret.p_tile_.unique());
+            energy_ += rf_net->Energy() + du_net->Energy();
             ret.p_tile_.reset();
 
-             std::cout << "Storage<" << storage_id << ">:" << std::endl 
-                << *storage_level; 
-            std::cout << "Connect<" << storage_id << ">:";
-            std::cout << "rf_net: " << rf_net->Energy();
-            std::cout << "du_net: " << du_net->Energy();
-            std::cout << std::endl;
+            std::cout << "============BEG finalizeStat==============" << std::endl; 
+            std::cout << "storage_id:" << storage_id << std::endl;
+            storage_level->Print(std::cout); 
+            std::cout << ret;
+            std::cout << "============END finalizeStat=============" << std::endl; 
+
+            //  std::cout << "Storage<" << storage_id << ">:" << std::endl 
+            //     << *storage_level; 
+            // std::cout << "Connect<" << storage_id << ">:";
+            // std::cout << "rf_net: " << rf_net->Energy();
+            // std::cout << "du_net: " << du_net->Energy();
+            // std::cout << std::endl;
         }
 
     } // namespace TileFlow

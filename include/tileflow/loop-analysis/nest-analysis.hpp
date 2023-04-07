@@ -64,6 +64,7 @@ namespace TileFlow {
         const problem::Workload& common_workload_;
 
         std::uint64_t cycle_;
+        double energy_;
         
         void add_access_pattern(
             problem::Shape::DataSpaceID producer_id, 
@@ -134,6 +135,7 @@ namespace TileFlow {
 
         void analyze();
         void Print();
+        void Report();
         friend class Displayer;
         friend class DatamovementCalculator;
         friend class DimScaleCalculator;
@@ -207,9 +209,11 @@ namespace TileFlow {
         */
         std::stack<InputParam> input_stack_;
         std::stack<RetVal> ret_stack_;
+
+        double energy_;
         // const Node* curr_node_;
         RetVal computeDelta(const InputParam& input);
-        void finalizeStat(const Node* node, RetVal& ret);
+        void finalizeStat(unsigned storage_id, RetVal& ret);
         
         void visitTile(const TileNode*) override;
         void visitScope(const ScopeNode*) override;
@@ -223,6 +227,7 @@ namespace TileFlow {
             topology_(analysis.topology_){}
         
         RetVal eval(const Node*);
+        double Energy() {return energy_;}
         friend class PerfectLoopnestAnalyzer;
     };
 
@@ -405,11 +410,12 @@ namespace TileFlow {
     };
 
     class SpatialOffsetsCalculator: public mapping::TileFlow::Visitor {
+    public:
         struct offset_t {
             unsigned x, y;
             unsigned max_x;
-            
         };
+    private:
         offset_t merge(const offset_t& o1, const offset_t& o2);
         int replication_factor = 1;
         std::stack<offset_t> input_offsets, output_offsets;
@@ -421,6 +427,8 @@ namespace TileFlow {
         SpatialOffsetsCalculator(NestAnalysis& analysis): analysis_(analysis){
         }
     };    
+
+    std::ostream& operator << (std::ostream& o, const SpatialOffsetsCalculator::offset_t& offset);
 
     class ComputeExpansion: public mapping::TileFlow::Visitor {
         void visitTile(const TileNode*) override;

@@ -82,8 +82,7 @@ int main(int argc, char* argv[])
   analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_, topology_);
   analysis.analyze();
   analysis.Print();
-
-  std::cout << "Parser check passed!" << std::endl;
-
+  analysis.Report();
+  
   return 0;
 }
