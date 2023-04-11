@@ -14,6 +14,7 @@ namespace analysis
             MemoryState::set_workload(&workload_);
             InputParam input;
             input.num_epochs_ = 1;
+            assert(input.cur_transform_.Order() == problem::GetShape()->NumFlattenedDimensions);
             for (unsigned dim = 0;
                  dim < problem::GetShape()->NumFlattenedDimensions; dim++)
             {
@@ -28,6 +29,7 @@ namespace analysis
 
         void DatamovementCalculator::visitOp(const OpNode *node)
         {
+            assert(input_stack_.size() == 1);
             auto input = input_stack_.top();
             assert(input.curr_node_ == node);
             input_stack_.pop();
@@ -85,17 +87,20 @@ namespace analysis
             energy_ += level->Energy();
             ret_stack_.push(ret);
             
-            std::cout << "========BEG Compute Stat=========" << std::endl;
-            std::cout << input;
-            std::cout << ret;
-            level->Print(std::cout);
-            std::cout << "========END Compute Stat=========" << std::endl;
-
+            if (verbose_level) {
+                std::cout << "========BEG Compute Stat=========" << std::endl;
+                std::cout << input;
+                std::cout << ret;
+                level->Print(std::cout);
+                std::cout << "========END Compute Stat=========" << std::endl;
+            }
         }
 
         void DatamovementCalculator::visitTile(const TileNode *node)
         {
-            auto &input = input_stack_.top();
+            assert(input_stack_.size() == 1);
+            auto input = input_stack_.top();
+            input_stack_.pop();
             assert(input.curr_node_ == node);
             analysis::TileFlow::PerfectLoopnestAnalyzer analyzer(*this, input, analysis_.configs[node]);
             auto &config = analysis_.configs[node];
@@ -151,14 +156,16 @@ namespace analysis
             input.curr_node_->accept(this);
             auto ret = ret_stack_.top();
             ret_stack_.pop();
-            std::cout << "======ComputeDelta========" << std::endl;
-            std::cout << "------Node--------" << std::endl;
-            input.curr_node_->display("", false);
-            std::cout << "------Input-------" << std::endl;
-            std::cout << input;
-            std::cout << "------Output------" << std::endl;
-            std::cout << ret;
-            std::cout << "============END===========" << std::endl;
+            if (verbose_level) {
+                std::cout << "======ComputeDelta========" << std::endl;
+                std::cout << "------Node--------" << std::endl;
+                input.curr_node_->display("", false);
+                std::cout << "------Input-------" << std::endl;
+                std::cout << input;
+                std::cout << "------Output------" << std::endl;
+                std::cout << ret;
+                std::cout << "============END===========" << std::endl;
+            }
 
             return ret;
         }
@@ -185,18 +192,14 @@ namespace analysis
             energy_ += rf_net->Energy() + du_net->Energy();
             ret.p_tile_.reset();
 
-            std::cout << "============BEG finalizeStat==============" << std::endl; 
-            std::cout << "storage_id:" << storage_id << std::endl;
-            storage_level->Print(std::cout); 
-            std::cout << ret;
-            std::cout << "============END finalizeStat=============" << std::endl; 
 
-            //  std::cout << "Storage<" << storage_id << ">:" << std::endl 
-            //     << *storage_level; 
-            // std::cout << "Connect<" << storage_id << ">:";
-            // std::cout << "rf_net: " << rf_net->Energy();
-            // std::cout << "du_net: " << du_net->Energy();
-            // std::cout << std::endl;
+            if (verbose_level) {
+                std::cout << "============BEG finalizeStat==============" << std::endl; 
+                std::cout << "storage_id:" << storage_id << std::endl;
+                storage_level->Print(std::cout); 
+                std::cout << ret;
+                std::cout << "============END finalizeStat=============" << std::endl; 
+            }
         }
 
     } // namespace TileFlow

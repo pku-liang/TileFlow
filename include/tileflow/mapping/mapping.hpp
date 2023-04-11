@@ -98,12 +98,14 @@ private:
     // std::pair<int, int> represent the <end, residual end>
     std::vector<loop::TileFlow::Descriptor> loopnests_;
     TileNode::type_t type_;
+    bool multicast_enabled_ = true; 
 
 public:
     TileNode(config::CompoundConfigNode config);
     void display(std::string prefix, bool recursive) const override;
     void accept(Visitor* visitor) const {visitor->visitTile(this);}
     bool is_spatial() const {return type_ == Spatial;}
+    bool is_multicast_enabled() const {return multicast_enabled_;}
     TileNode::type_t get_tile_type() const {return type_;}
     
     loop::Nest constructLoopNest() const;

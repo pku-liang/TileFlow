@@ -33,6 +33,12 @@ int main(int argc, char* argv[])
   auto config = new config::CompoundConfig(input_files);
 
   auto root = config->getRoot();
+
+  if (root.exists("macro")) 
+    TileFlow::macros = root.lookup("macro");
+  
+  if (root.exists("verbose"))
+    root.lookupValue("verbose", TileFlow::verbose_level);
   
   auto problem = root.lookup("problem");
   problem::TileFlow::Workloads workloads;
@@ -67,11 +73,13 @@ int main(int argc, char* argv[])
   problem::TileFlow::ParseWorkloads(problem, workloads);
   problem::Workload::SetCurrShape(&workloads.get_shape());
 
-  workloads.Print();
+  if (TileFlow::verbose_level)
+    workloads.Print();
 
   auto mapping = mapping::TileFlow::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
   
-  mapping.Print();
+  if (TileFlow::verbose_level)
+    mapping.Print();
 
 
   model::TileFlow::Topology topology_;
@@ -81,8 +89,17 @@ int main(int argc, char* argv[])
 
   analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_, topology_);
   analysis.analyze();
-  analysis.Print();
+  
+  if (TileFlow::verbose_level)
+    analysis.Print();
+  
   analysis.Report();
+
+  if (root.exists("output"))  {
+    std::string filename;
+    root.lookupValue("output", filename);
+    analysis.Export(filename);
+  }
   
   return 0;
 }

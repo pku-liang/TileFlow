@@ -1,0 +1,50 @@
+architecture: 
+  version: 0.2 
+
+  subtree:
+  - name: System
+    
+    local: 
+    - name: MainMemory
+      class: DRAM 
+      attributes:
+        block-size: 1048576
+        word-bits: 16
+        read_bandwidth: 4.3
+        write_bandwidth: 2.9
+      
+    subtree: 
+    - name: Buffer 
+    
+      local:  
+      - name: Cache 
+        class: SRAM
+        attributes:
+          word-bits: 16
+          block_size: 16384
+          depth: 3
+          read_bandwidth: 52
+          write_bandwidth: 20 # 16 
+
+
+      subtree:
+      - name: PE
+
+        local: 
+        - name: RegFile[0..255] 
+          class: regfile
+          attributes:
+            meshX: 16
+            meshY: 16
+            depth: 1
+            block_size: 3
+            word-bits: 16
+            read_bandwidth: 3.2
+            write_bandwidth: 3.2
+
+        - name: mac[0..255] 
+          class: intmac 
+          attributes: 
+            word-bits: 16
+            meshX: 16
+            meshY: 16

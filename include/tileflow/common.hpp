@@ -8,6 +8,14 @@
 
 #define TILEFLOW_WARNING(msg) do{std::cerr << "[WARNING]: " << msg << std::endl;}while(0)
 
+#include "compound-config/compound-config.hpp"
+
 const int MaxTensors = 32;
 
-const int verbose_level = 1;
+namespace TileFlow {
+
+extern int verbose_level;
+
+extern config::CompoundConfigNode macros;
+
+}

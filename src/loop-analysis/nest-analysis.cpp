@@ -1,6 +1,9 @@
 #include <stack>
+#include <fstream>
 
 #include "tileflow/loop-analysis/nest-analysis.hpp"
+
+using TileFlow::verbose_level;
 
 namespace analysis
 {
@@ -201,6 +204,20 @@ namespace analysis
             std::cout << "***TileFlow Result Ends" << std::endl;
         }
 
+        void NestAnalysis::Export(const std::string& filename) {
+            std::ofstream file;
+            size_t tmp = filename.find_last_of('.');
+            if (tmp == std::string::npos || filename.substr(tmp) != ".csv")
+                file.open(filename + ".csv");
+            else file.open(filename);
+            file << "metric,value" << std::endl;
+            file << "Cycle," << cycle_ << std::endl;
+            file << "Energy," << energy_ << std::endl;
+            if (verbose_level)
+                std::cout << "[TileFlow]: result written into " << filename << std::endl;
+            file.close();
+        }
+
         void Displayer::visitTile(const TileNode *node)
         {
             std::cout << prefix_ << "Tile:" << std::endl;
@@ -222,7 +239,11 @@ namespace analysis
                 std::cout << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
                 std::cout << prefix_ << "l-fanout" << config.logical_x << "," << config.logical_y << std::endl;
                 std::cout << prefix_ << "repFactor:" << config.replication_factor << std::endl;
-                
+                std::cout << prefix_ << "strides:" << std::endl;
+                for (unsigned i = 0; i < config.loop_nest.loops.size(); i++) {
+                    std::cout << prefix_ << config.loop_nest.loops[i].PrintCompact() << ":" 
+                        << config.vector_strides_[i] << std::endl;
+                }
                 for (auto& kv: config.stats_) {
                     std::cout << prefix_ << "<";
                     for (auto&x: kv.first) std::cout << x << ",";
@@ -274,7 +295,8 @@ namespace analysis
         {
             node->display(prefix_, false);
             std::cout << prefix_ << "ComputeInfo:";
-            auto& info = analysis_.configs[node].stats_;
+            auto& config = analysis_.configs[node];
+            auto& info = config.stats_;
             for (auto& kv: info) {
                 std::cout << "<";
                 for (auto& idx: kv.first) std::cout << idx << ",";
@@ -283,6 +305,14 @@ namespace analysis
                     << kv.second.compute_info_.replication_factor << ",";
             }
             auto& compute_info = analysis_.tiles_.at(node).compute_info;
+            std::cout << std::endl;
+            std::cout << "active_read_tensors:";
+            for (auto pv: config.active_read_tensors) 
+                std::cout << problem::GetShape()->DataSpaceIDToName.at(pv) << ",";
+            std::cout << std::endl;
+            std::cout << "active_fill_tensors:";
+            for (auto pv: config.active_fill_tensors) 
+                std::cout << problem::GetShape()->DataSpaceIDToName.at(pv) << ",";
             std::cout << std::endl;
             std::cout << prefix_<< "repFactor:" << compute_info.replication_factor << std::endl;
             std::cout << prefix_<< "accesses:" << compute_info.accesses << std::endl;
@@ -686,6 +716,7 @@ namespace analysis
             
             // 2. recursive call to simulate the running;
             RetVal ret;
+            ret.last_working_set_[0] = point_set;
             if (input_.num_epochs_){
                 ret.p_tile_ = std::make_shared<tiling::CompoundTile>();
                 for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces;
@@ -702,7 +733,6 @@ namespace analysis
                 if (input_.init_working_set_.getDataSpaces().count(0))
                     ret.deltas_[0] = point_set - input_.init_working_set_.at(0);
                 else ret.deltas_[0] = point_set;
-                ret.last_working_set_[0] = point_set;
                 problem::PerDataSpace<std::uint64_t> link_transfers;
                 ComputeStats(input_.init_working_set_, ret.deltas_, 
                     ret.access_stat_, link_transfers);
@@ -876,6 +906,13 @@ namespace analysis
                     auto& src_temporal_delta = ret.deltas_[src_delta_index];
                     auto& dst_last_working_set = ret.last_working_set_[dst_delta_index];
                     auto& src_last_working_set = ret.last_working_set_[src_delta_index];
+                    
+                    // std::cout << "index:";
+                    // for (auto idx: indices_) std::cout << idx << ",";
+                    // std::cout << "baseidx: " << base_index  << ",";
+                    // std::cout << "translation_vector:" << translation_vectors << std::endl;
+                    // std::cout << "dst:" << dst_delta_index << ", src:" << src_delta_index << std::endl;
+                    
                     for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
                     {
                         dst_temporal_delta.GetDataSpace(pv) = src_temporal_delta.GetDataSpace(pv);
@@ -951,7 +988,9 @@ namespace analysis
             if (enable_link_transfer) {
                 ComputeLinkTransfer(last_working_set, deltas, link_transfers, unaccounted_delta);
             }
-            ComputeAccessStat(deltas, unaccounted_delta, access_stats);
+            bool enable_multicast = 
+                static_cast<const TileNode*>(input_.curr_node_)->is_multicast_enabled();
+            ComputeAccessStat(deltas, unaccounted_delta, access_stats, enable_multicast);
             return;   
         }
 
@@ -1052,7 +1091,21 @@ namespace analysis
                     }
                 }
             }
-
+            if (verbose_level) {
+                std::cout << "===========BEG LINK===========" << std::endl;
+                std::cout << "last working set:" << std::endl;
+                last_working_set.show();
+                std::cout << "delta:" << std::endl;
+                delta.show();
+                std::cout << "num_epochs_: " << num_epochs_ << std::endl;
+                std::cout << "link transfer:";
+                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; ++pv) {
+                    std::cout << problem::GetShape()->DataSpaceIDToName.at(pv) 
+                        << ":" << link_transfers[pv] << ",";
+                }
+                std::cout << std::endl;
+                std::cout << "===========END LINK===========" << std::endl;
+            }
         }
 
         void PerfectLoopnestAnalyzer::ComputeAccessStat(

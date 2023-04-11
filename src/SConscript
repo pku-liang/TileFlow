@@ -99,6 +99,7 @@ lib_sources = Split("""
 ./loop-analysis/memory-state.cpp
 ./loop-analysis/dm-calculator.cpp
 ./model/topology.cpp
+./common.cpp
 """)
 
 libenv = env.Clone()

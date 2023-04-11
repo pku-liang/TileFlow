@@ -4,6 +4,9 @@
 
 #include "tileflow/mapping/mapping.hpp"
 
+using TileFlow::macros;
+using TileFlow::verbose_level;
+
 namespace mapping {
 
 namespace TileFlow {
@@ -68,6 +71,10 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
 
     ParseStorageLevel(config);
 
+    if (config.exists("multicast")) {
+        config.lookupValue("multicast", multicast_enabled_);
+    }
+
     unsigned split = iters.size();
     config.lookupValue("split", split);
     for (int i = (int)iters.size()-1; i >= 0; --i) {
@@ -89,7 +96,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
 std::unordered_map<std::string, std::pair<int, int> > Node::ParseFactors(
     const std::string& buffer) {
     std::unordered_map<std::string, std::pair<int, int> > loop_bounds;
-    std::regex re("([A-Za-z]+)[[:space:]]*[=]*[[:space:]]*([0-9]+)(,([0-9]+))?", std::regex::extended);
+    std::regex re("([A-Za-z]+)[[:space:]]*[=]*[[:space:]]*([0-9A-Za-z_]+)(,([0-9]+))?", std::regex::extended);
     std::smatch sm;
     std::string str = std::string(buffer);
     str = str.substr(0, str.find("#"));
@@ -98,7 +105,11 @@ std::unordered_map<std::string, std::pair<int, int> > Node::ParseFactors(
     {
         std::string dimension_name = sm[1];
 
-        int end = std::stoi(sm[2]);
+        int end;
+        if (macros.exists(sm[2])){
+            macros.lookupValue(sm[2], end);
+        }
+        else end = std::stoi(sm[2]);
 
         int residual_end = end;
         if (sm[4] != "")
@@ -259,7 +270,7 @@ Mapping ParseAndConstruct(config::CompoundConfigNode config,
     arch_props_ = ArchProperties();
     arch_props_.Construct(arch_specs);
     p_workloads_ = &workloads;
-    
+
     Mapping mapping;
     mapping.root = RecursiveParse(config);
     mapping.fanoutX_map = arch_props_.FanoutX();

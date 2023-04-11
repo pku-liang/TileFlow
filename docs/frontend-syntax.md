@@ -52,9 +52,16 @@ There are three kinds of nodes:
 - Scope Node: to specify the boundary of memory hierarchy; The only attribute of a scope node is its sub-types: Sharing/Temporal/Spatial/Pipeline.  
 
 - Tile Node: to specify the temporal/spatial mapping of loops. The key attributes include factors, permutations, target, split, etc.. See [this](https://timeloop.csail.mit.edu/timeloop/input-formats/mapping) for illustration.
+    - Key knobs:
+        - multicast [true|false]: used for spatial tile to specify whether the higher memory level's bandwidth can perform multicast. 
 
 - Op Node: to specify the arithmetic operations; Attributes:
     - name: the name of operation;
 
 
+## Others
+
+- `macro` attribute: list some constant values that can be used as tile factors/tensor shapes
+- `verbose` attribute: specify the verbose level;
+- `output` attribute: specify the output file;
 

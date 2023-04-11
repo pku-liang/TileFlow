@@ -2,6 +2,9 @@
 
 #include "tileflow/problem/problem.hpp"
 
+using TileFlow::macros;
+using TileFlow::verbose_level;
+
 namespace problem { 
 
 namespace TileFlow{
@@ -165,8 +168,14 @@ void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads) {
     auto factorized_bounds = config.lookup("instance");
     for (auto dim: dims) {
       TILEFLOW_ASSERT(factorized_bounds.exists(dim), "no instance passed for axis " << dim << ".");
+      std::string _tmp;
+      factorized_bounds.lookupValue(dim, _tmp);
       int bound;
-      factorized_bounds.lookupValue(dim, bound);
+      if (macros.exists(_tmp)) {
+        TILEFLOW_ASSERT(macros.lookupValue(_tmp, bound), 
+        _tmp << " is not a specified MACRO");
+      }
+      else bound = std::stoi(_tmp);
       workloads.set_factorized_bound(dim, bound); 
     }
   }

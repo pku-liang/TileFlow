@@ -19,6 +19,7 @@ using mapping::TileFlow::TileNode;
 using mapping::TileFlow::ScopeNode;
 using mapping::TileFlow::Visitor;
 
+using TileFlow::verbose_level;
 
 namespace analysis {
 
@@ -136,6 +137,7 @@ namespace TileFlow {
         void analyze();
         void Print();
         void Report();
+        void Export(const std::string& filename);
         friend class Displayer;
         friend class DatamovementCalculator;
         friend class DimScaleCalculator;
@@ -233,7 +235,7 @@ namespace TileFlow {
 
     class PerfectLoopnestAnalyzer: public analysis::NestAnalysis {
         DatamovementCalculator& dm_;
-        const InputParam& input_;
+        const InputParam input_;
         NodeConfig& config_;
         RetVal ComputeTemporalWorkingSet();
         RetVal ComputeSpatialWorkingSet();
@@ -276,7 +278,7 @@ namespace TileFlow {
             const MemoryState& delta, 
             problem::PerDataSpace<std::unordered_set<std::uint64_t>>& unaccounted_delta, 
             problem::PerDataSpace<AccessStatMatrix>& access_stat,
-            bool enable_multicast = true
+            bool enable_multicast = false
         );
 
         void ComputePeerAccesses(
