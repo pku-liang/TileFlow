@@ -39,8 +39,8 @@ public:
     };
 protected:
     Node::type_t type_;
-    Node* parent_ = nullptr;
-    std::vector<Node*> children_;
+    mutable const Node* parent_ = nullptr;
+    std::vector<const Node*> children_;
     std::string storage_level_name_;
     unsigned storage_level_;
 
@@ -54,13 +54,29 @@ public:
     unsigned get_storage_level() const {return storage_level_;}
     std::string get_storage_name() const {return storage_level_name_;}
     type_t get_type() const {return type_;}
-    void add_child(Node* child) {assert(child != nullptr); children_.push_back(child); child->set_parent(this);}
-    const std::vector<const Node*> get_children() const{
-        std::vector<const Node*> retval;
-        for (auto child: children_) retval.push_back(child);
-        return retval;
+    void add_child(const Node* child) {assert(child != nullptr); children_.push_back(child); child->set_parent(this);}
+    void replace_child(const Node* old_child, const Node* new_child){
+        auto iter = find(children_.begin(), children_.end(), old_child);
+        if (iter != children_.end()) {
+            iter = children_.erase(iter);
+            children_.insert(iter, new_child);
+            new_child->set_parent(this);
+        }
     }
-    void set_parent(Node* parent) {parent_ = parent;}
+    const std::vector<const Node*> get_children() const{
+        return children_;
+    }
+    void set_children(const std::vector<const Node*>& children) {
+        children_ = children;
+    }
+
+    void reset_children() {children_.clear();}
+
+    const Node* get_first_child() const {
+        assert(children_.size());
+        return children_.front();
+    }
+    void set_parent(const Node* parent) const {parent_ = parent;}
     inline const Node* get_parent() const {return parent_;}
 
     virtual void display(std::string prefix, bool = true) const {std::cout << prefix << std::endl;}

@@ -3,7 +3,7 @@
 
 namespace TileFlow {
 
-int verbose_level = 1;
+int verbose_level = 0;
 
 config::CompoundConfigNode macros;
 

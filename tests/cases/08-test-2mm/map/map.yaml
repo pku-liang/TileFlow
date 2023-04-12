@@ -1,7 +1,7 @@
 mapping:
   node-type: Tile 
   type: temporal 
-  factors: M=32 L=32 
+  factors: M=64 L=32 
   permutation: ML 
   target: MainMemory 
   
@@ -12,7 +12,7 @@ mapping:
     subtree: 
       - node-type: Tile 
         type: Spatial 
-        factors: M=4 L=4 
+        factors: M=2 L=4 
         split: 1
         permutation: ML 
         target: MainMemory
@@ -29,17 +29,18 @@ mapping:
             name: GEMM1 
             binding: M:M L:L K:K 
 
-      - node-type: Scope 
-        type: Sequential 
+      # A common spatial tile
+      - node-type: Tile
+        type: Spatial 
+        factors: M=2 L=4 
+        permutation: ML 
+        split: 1
+        target: MainMemory 
 
-        subtree: 
-        - node-type: Tile 
-          type: Spatial 
-          factors: M=4 L=4
-          permutation: ML 
-          split: 1
-          target: MainMemory
-          
+        subtree:
+        - node-type: Scope 
+          type: Sequential 
+
           subtree: 
           - node-type: Tile 
             type: temporal 
@@ -51,14 +52,8 @@ mapping:
             - node-type: Op
               name: EXP  
               binding: M:M, L:L 
-        - node-type: Tile
-          type: Spatial 
-          factors: M=4 L=4 
-          permutation: ML 
-          split: 1
-          target: MainMemory 
 
-          subtree:
+
           - node-type: Tile 
             type: temporal 
             factors: M=4 L=4 N=64 

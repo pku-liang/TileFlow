@@ -73,6 +73,10 @@ namespace TileFlow {
             problem::Shape::DataSpaceID consumer_id,
             const Node* consumer);
         /**
+         * \brief Swap the spatial node and its scope child
+        */
+        inline void swap_spatial_scope();
+        /**
          * \brief sanity check
         */
        inline void sanity_check();
@@ -440,6 +444,10 @@ namespace TileFlow {
     public: 
         ComputeExpansion(NestAnalysis& analysis): analysis_(analysis),
         expansion_(1,1) {}
+    };
+
+    class SpatialScopeSwapper: public mapping::TileFlow::Visitor {
+        void visitScope(const ScopeNode*) override;
     };
 
 } // namespace TileFlow 

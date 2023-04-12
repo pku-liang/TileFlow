@@ -47,6 +47,7 @@ namespace analysis
 
         void NestAnalysis::analyze()
         {
+            swap_spatial_scope();
             sanity_check();
             get_loopnest();
             get_dimscale();
@@ -55,6 +56,11 @@ namespace analysis
             get_spatial_offsets();
             get_expansion();
             get_datamovement();
+        }
+
+        void NestAnalysis::swap_spatial_scope() {
+            SpatialScopeSwapper pass;
+            pass.run(mapping_.root);
         }
 
         void NestAnalysis::sanity_check() {
@@ -378,7 +384,7 @@ namespace analysis
             auto& storage_level = config.storage_level = 0;
             for (auto child: node->get_children()) {
                 child->accept(this);
-                assert(!storage_levels_.empty());
+                TILEFLOW_ASSERT(!storage_levels_.empty(), "Is there an op node under the Scope Node?");
                 storage_level = std::max(storage_level, storage_levels_.top());
                 storage_levels_.pop();
             }
@@ -388,7 +394,11 @@ namespace analysis
         }
 
         void StorageLevelCalculator::visitTile(const TileNode* node) {
-            for (auto child: node->get_children()) child->accept(this);
+            for (auto child: node->get_children()) {
+                child->accept(this);
+                if (!storage_levels_.empty())
+                    storage_levels_.pop();
+            }
             auto& config = analysis_.configs[node];
             config.storage_level = node->get_storage_level();
             if (node->is_spatial()) {
@@ -398,6 +408,8 @@ namespace analysis
             else config.fanout_x = config.fanout_y = 1;
             storage_levels_.push(config.storage_level);
         }
+
+
 
         SpatialOffsetsCalculator::offset_t SpatialOffsetsCalculator::merge(
             const SpatialOffsetsCalculator::offset_t& o1,
@@ -1424,6 +1436,43 @@ namespace analysis
             TILEFLOW_ASSERT(storage_level_ == 0, 
             " missing temporal tiles for storage level under " << storage_level_);
         } 
+
+        void SpatialScopeSwapper::visitScope(const ScopeNode* node){
+            auto parent = node->get_parent();
+            if (parent && parent->get_type() == Node::Tile) {
+                auto parent_ = static_cast<const TileNode*>(parent);
+                if (parent_->get_tile_type() == TileNode::Spatial) {
+                    TILEFLOW_ASSERT(node->get_scope_type() == ScopeNode::Sequential
+                    || node->get_scope_type() == ScopeNode::Sharing, 
+                    "A spatial tile's child cannot be a parallel/pipeline scope");
+                    
+                    auto node_ = const_cast<ScopeNode*>(node);
+                    
+                    std::vector<const Node*> new_nodes;
+                    for (auto child: node_->get_children()) {
+                        Node * new_node = new TileNode(*parent_);
+                        assert(new_node);
+                        new_nodes.push_back(new_node);
+                        new_node->reset_children();
+                        new_node->set_parent(node_);
+                        new_node->add_child(child);
+                    }
+
+                    node_->set_children(new_nodes);
+                    node_->set_parent(parent_->get_parent());
+
+                    if (parent_->get_parent()) {
+                        const_cast<Node*>(parent_->get_parent())->replace_child(parent_, node_);
+                    }
+
+                    // erase all child for safe deconstruct 
+                    const_cast<TileNode*>(parent_)->reset_children();
+                    delete parent_;
+                }
+            }
+            for (auto child: node->get_children())
+                child->accept(this);
+        }
 
     } // namespace TileFlow
 
