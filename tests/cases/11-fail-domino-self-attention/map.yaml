@@ -1,0 +1,151 @@
+mapping:
+  node-type: Tile
+  type: Temporal
+  factors: H=1 M=512 N=8 L=1 A=32
+  permutation: HMNLA
+  target: L1
+
+  subtree:
+    - node-type: Scope
+      type: Parallel
+
+      subtree:
+        - node-type: Tile
+          type: Spatial
+          factors: H=1 M=1 L=1 A=1
+          permutation: HMLA
+          target: L1
+
+          subtree:
+            - node-type: Tile
+              type: Temporal
+              factors: H=16 M=1 L=512 A=2
+              permutation: HMLA
+              target: L0
+
+              subtree:
+                - node-type: Op
+                  name: ProduceC
+                  binding: H:H M:M L:L A:A
+        - node-type: Scope
+          type: Pipeline
+
+          subtree:
+            - node-type: Tile
+              type: Spatial
+              factors: H=1 M=1 L=1
+              permutation: HML
+              target: L1
+
+              subtree:
+                - node-type: Tile
+                  type: Temporal
+                  factors: H=16 M=1 L=512
+                  permutation: HML
+                  target: L0
+
+                  subtree:
+                    - node-type: Op
+                      name: ProduceB
+                      binding: H:H M:M L:L
+            - node-type: Scope
+              type: Parallel
+
+              subtree:
+                - node-type: Tile
+                  type: Spatial
+                  factors: H=1 M=1 L=1
+                  permutation: HML
+                  target: L1
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: H=16 M=1 L=512
+                      permutation: HML
+                      target: L0
+
+                      subtree:
+                        - node-type: Op
+                          name: ProduceD
+                          binding: H:H M:M L:L
+                - node-type: Scope
+                  type: Pipeline
+
+                  subtree:
+                    - node-type: Tile
+                      type: Spatial
+                      factors: H=1 M=1 L=1
+                      permutation: HML
+                      target: L1
+
+                      subtree:
+                        - node-type: Tile
+                          type: Temporal
+                          factors: H=16 M=1 L=512
+                          permutation: HML
+                          target: L0
+
+                          subtree:
+                            - node-type: Op
+                              name: ProduceE
+                              binding: H:H M:M L:L
+                    - node-type: Scope
+                      type: Sequential
+
+                      subtree:
+                        - node-type: Tile
+                          type: Spatial
+                          factors: H=1 M=1 L=1
+                          permutation: HML
+                          target: L1
+
+                          subtree:
+                            - node-type: Tile
+                              type: Temporal
+                              factors: H=16 M=1 L=512
+                              permutation: HML
+                              target: L0
+
+                              subtree:
+                                - node-type: Op
+                                  name: ProduceF
+                                  binding: H:H M:M L:L
+                        - node-type: Scope
+                          type: Sequential
+
+                          subtree:
+                            - node-type: Tile
+                              type: Spatial
+                              factors: H=1 M=1 L=1
+                              permutation: HML
+                              target: L1
+
+                              subtree:
+                                - node-type: Tile
+                                  type: Temporal
+                                  factors: H=16 M=1 L=512
+                                  permutation: HML
+                                  target: L0
+
+                                  subtree:
+                                    - node-type: Op
+                                      name: ProduceG
+                                      binding: H:H M:M L:L
+                            - node-type: Tile
+                              type: Spatial
+                              factors: H=1 M=1 N=4 L=1
+                              permutation: HMNL
+                              target: L1
+
+                              subtree:
+                                - node-type: Tile
+                                  type: Temporal
+                                  factors: H=16 M=1 N=2 L=512
+                                  permutation: HMNL
+                                  target: L0
+
+                                  subtree:
+                                    - node-type: Op
+                                      name: ProduceI
+                                      binding: H:H M:M N:N L:L

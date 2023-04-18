@@ -1,0 +1,146 @@
+problem:
+  io:
+    ins: Q K V
+    outs: I
+  dimensions: [H,M,N,A,L]
+  instance:
+    H: 16
+    M: 512
+    N: 64
+    A: 64
+    L: 512
+
+  ops:
+  - name: ProduceC
+    dimensions: [H,A,L,M]
+    data-spaces:
+    - name: C
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: K
+      projection:
+        - [[H]]
+        - [[A]]
+        - [[L]]
+    - name: Q
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[A]]
+    ins: K, Q
+    out: C
+
+  - name: ProduceB
+    dimensions: [H,M,L]
+    data-spaces:
+    - name: B
+      projection:
+        - [[H]]
+        - [[M]]
+      read-write: True
+    - name: C
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: C
+    out: B
+
+  - name: ProduceD
+    dimensions: [H,M,L]
+    data-spaces:
+    - name: D
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: B
+      projection:
+        - [[H]]
+        - [[M]]
+    - name: C
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: B, C
+    out: D
+
+  - name: ProduceE
+    dimensions: [H,M,L]
+    data-spaces:
+    - name: E
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: D
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: D
+    out: E
+
+  - name: ProduceF
+    dimensions: [H,M,L]
+    data-spaces:
+    - name: F
+      projection:
+        - [[H]]
+        - [[M]]
+      read-write: True
+    - name: E
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: E
+    out: F
+
+  - name: ProduceG
+    dimensions: [H,M,L]
+    data-spaces:
+    - name: G
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: F
+      projection:
+        - [[H]]
+        - [[M]]
+    - name: B
+      projection:
+        - [[H]]
+        - [[M]]
+    ins: F, B
+    out: G
+
+  - name: ProduceI
+    dimensions: [H,L,N,M]
+    data-spaces:
+    - name: I
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[N]]
+      read-write: True
+    - name: V
+      projection:
+        - [[H]]
+        - [[L]]
+        - [[N]]
+    - name: G
+      projection:
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: V, G
+    out: I
