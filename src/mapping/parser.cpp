@@ -31,6 +31,9 @@ ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope){
     else if (type_s.find("pipe") != std::string::npos) {
         type = Pipeline;
     }
+    else if (type_s.find("shar") != std::string::npos) {
+        type = Sharing;
+    }
     else {TILEFLOW_ERROR("ScopeNode type error. Should has type sequential/parallel");}
 
 }   
