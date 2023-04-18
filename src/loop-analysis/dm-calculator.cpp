@@ -40,12 +40,14 @@ namespace analysis
                 return;
             }
 
-            auto &active_tensors = analysis_.configs.at(node).active_read_tensors;
+            auto &fill_tensors = node->get_active_tensors().fill_tensors;
+            auto &wb_tensors = node->get_active_tensors().wb_tensors;
             problem::OperationSpace point_set(MemoryState::workload_,
                                               input.cur_transform_, input.cur_transform_); // A single point
             for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++)
             {
-                if (find(active_tensors.begin(), active_tensors.end(), pv) == active_tensors.end())
+                if (find(fill_tensors.begin(), fill_tensors.end(), pv) == fill_tensors.end() && 
+                find(wb_tensors.begin(), wb_tensors.end(), pv) == wb_tensors.end())
                     point_set.GetDataSpace(pv).Reset();
                 else {
                     ret.access_stat_[pv](1,1).accesses = point_set.GetSize(pv) * input.num_epochs_;

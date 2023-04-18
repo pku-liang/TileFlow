@@ -3,9 +3,11 @@
 #include "mapping/arch-properties.hpp"
 
 #include "tileflow/mapping/mapping.hpp"
+#include "tileflow/mapper/mapper.hpp"
 
 using TileFlow::macros;
 using TileFlow::verbose_level;
+using TileFlow::global_symbol_table_;
 
 namespace mapping {
 
@@ -30,6 +32,9 @@ ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope){
     }
     else if (type_s.find("pipe") != std::string::npos) {
         type = Pipeline;
+    }
+    else if (type_s.find("sharing") != std::string::npos ){
+        type = Sharing;
     }
     else {TILEFLOW_ERROR("ScopeNode type error. Should has type sequential/parallel");}
 
@@ -96,7 +101,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
 std::unordered_map<std::string, std::pair<int, int> > Node::ParseFactors(
     const std::string& buffer) {
     std::unordered_map<std::string, std::pair<int, int> > loop_bounds;
-    std::regex re("([A-Za-z]+)[[:space:]]*[=]*[[:space:]]*([0-9A-Za-z_]+)(,([0-9]+))?", std::regex::extended);
+    std::regex re("([A-Za-z]+)[[:space:]]*[=]*[[:space:]]*([0-9A-Za-z_?]+)(,([0-9]+))?", std::regex::extended);
     std::smatch sm;
     std::string str = std::string(buffer);
     str = str.substr(0, str.find("#"));
@@ -109,7 +114,13 @@ std::unordered_map<std::string, std::pair<int, int> > Node::ParseFactors(
         if (macros.exists(sm[2])){
             macros.lookupValue(sm[2], end);
         }
-        else end = std::stoi(sm[2]);
+        else {
+            char* ptr = nullptr;
+            end = std::strtol(sm[2].str().c_str(), &ptr, 10);
+            if (ptr && *ptr) {
+                end = global_symbol_table_.insert(sm[2]);
+            }
+        }
 
         int residual_end = end;
         if (sm[4] != "")
@@ -226,19 +237,34 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
 }
 
 void TileNode::display(std::string prefix, bool recursive) const{
+    display_active_tensors(prefix);
     for (auto& loop: loopnests_) {
         std::cout << prefix;
-        loop.Print(std::cout, true);
+        std::cout << "for " << loop.name_ << " in [" << loop.start << ":";
+        if (loop.end < 0) {
+            std::cout << global_symbol_table_.lookup(loop.end).name_;
+        }
+        else std::cout << loop.end; 
+        std::cout << ")";
+        if (loop::IsSpatial(loop.spacetime_dimension))
+        {
+            if (loop::IsSpatialX(loop.spacetime_dimension))
+                std::cout << " (Spatial-X)";
+            else
+                std::cout << " (Spatial-Y)";
+        }
         std::cout << ", " << arch_props_.Specs().topology.GetStorageLevel(storage_level_)->level_name;
         std::cout << std::endl;
         prefix += "  ";
     }
+
     if (recursive)
         for (auto child: children_)
             child->display(prefix);
 }
 
 void ScopeNode::display(std::string prefix, bool recursive) const{
+    display_active_tensors(prefix);
     std::cout << prefix << "Scope: ";
     if (type == Sequential) std::cout << "Sequential";
     else if (type == Parallel) std::cout << "Parallel";
@@ -253,13 +279,9 @@ void ScopeNode::display(std::string prefix, bool recursive) const{
 }
 
 void OpNode::display(std::string prefix, bool) const {
+    display_active_tensors(prefix);
     std::cout << prefix;
     p_workload->Print();
-    std::cout << prefix << ", binding: "; 
-    for (auto& bind: binding_) {
-        std::cout << bind.first << ":" << bind.second;
-        std::cout << ",";
-    } 
     std::cout << std::endl;
 }
 
@@ -279,12 +301,11 @@ Mapping ParseAndConstruct(config::CompoundConfigNode config,
     return mapping;
 }
 
-void Mapping::Print() {
+void Mapping::Print() const{
     std::cout << "-----------------Mapping---------------" << std::endl;
     std::cout << "root: " << root << std::endl;
     root->display("");
     std::cout << "---------------------------------------" << std::endl;
-
 }
 
 

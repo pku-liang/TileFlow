@@ -10,6 +10,8 @@
 #include "tileflow/mapping/mapping.hpp"
 #include "tileflow/loop-analysis/nest-analysis.hpp"
 #include "tileflow/model/topology.hpp"
+#include "tileflow/mapper/checker.hpp"
+#include "tileflow/mapper/mapper.hpp"
 
 extern bool gTerminateEval;
 
@@ -76,17 +78,45 @@ int main(int argc, char* argv[])
   if (TileFlow::verbose_level)
     workloads.Print();
 
-  auto mapping = mapping::TileFlow::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
+  model::TileFlow::Topology topology;
+
+  for (unsigned storage_level_id = 0; storage_level_id < arch_specs_.topology.NumStorageLevels();
+   ++ storage_level_id){
+    auto buffer = arch_specs_.topology.GetStorageLevel(storage_level_id);
+    TILEFLOW_COND_WARNING(buffer->size.Get(), "No memory size specified at " << buffer->name.Get());
+    if (verbose_level) {
+      std::cout << buffer->name.Get() << ": ";
+      std::cout << buffer->size.Get() << "words" << std::endl;
+    }
+   }
+
+  std::cout << "Begin Spec..." << std::endl; 
+  topology.Spec(arch_specs_.topology);
+
+  auto mapping = 
+    mapping::TileFlow::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
   
   if (TileFlow::verbose_level)
     mapping.Print();
 
+  TileFlow::Checker checker(workloads, mapping, topology);
+  
+  checker.check();
 
-  model::TileFlow::Topology topology_;
+  checker.display();
 
-  std::cout << "Begin Spec..." << std::endl; 
-  topology_.Spec(arch_specs_.topology);
+  TileFlow::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology);
 
+  mapper.search();
+
+  mapper.report();
+
+  if (root.exists("output")) {
+    std::string filename;
+    root.lookupValue("output", filename);
+    mapper.dump(filename);
+  }
+  /*
   analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_, topology_);
   analysis.analyze();
   
@@ -100,6 +130,8 @@ int main(int argc, char* argv[])
     root.lookupValue("output", filename);
     analysis.Export(filename);
   }
+
+  */
   
   return 0;
 }

@@ -1,0 +1,60 @@
+mapping:
+  node-type: Tile
+  type: Temporal
+  factors: M=MO
+  target: MainMemory
+  subtree:
+  - node-type: Scope
+    type: sequential 
+
+    subtree: 
+    - node-type: Tile 
+      type: temporal 
+      factors: M=MM K=KM L=LM
+      permutation: LMK # input stationary 
+      target: Cache
+
+      subtree:
+      - node-type: Tile 
+        type: spatial  
+        factors: M=16 K=16
+        permutation: MK
+        split: 1
+        target: Cache
+        multicast: true
+
+        subtree: 
+        - node-type: Tile 
+          type: temporal  
+          factors: M=1 L=1 K=1
+          permutation: MLK
+          target: RegFile
+          
+          subtree:
+          - node-type: Op
+            name: GEMM1
+            
+    - node-type: Tile 
+      type: temporal  
+      factors: M=MM L=LM N=NM
+      permutation: LMN # output stationary 
+      target: Cache 
+
+      subtree: 
+      - node-type: Tile 
+        type: spatial 
+        factors: M = 16 N = 16 
+        permutation: MN 
+        split: 1 
+        target: Cache 
+        multicast: true
+        
+        subtree: 
+        - node-type: Tile 
+          type: temporal 
+          factors: M=1 L=1 N=1
+          target: RegFile 
+
+          subtree: 
+          - node-type: Op 
+            name: GEMM2

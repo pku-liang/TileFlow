@@ -205,7 +205,13 @@ bool Workloads::add_workload(const std::string & name, std::shared_ptr<Workload>
 
   auto shape_ = workload->GetShape();
   for (auto& kv: shape_->DataSpaceIDToName) {
-    std::string access_pattern_name = name + "::" + kv.second;
+    std::string access_pattern_name = kv.second;
+    if (common_shape_.DataSpaceNameToID.count(access_pattern_name)) {
+      auto id = common_shape_.DataSpaceNameToID.at(access_pattern_name);
+      TILEFLOW_ASSERT(common_shape_.DataSpaceOrder[id] == shape_->DataSpaceOrder.at(kv.first),
+      "tensor " << access_pattern_name << " has mismatched order");
+      continue;
+    }
     auto & id = common_shape_.NumDataSpaces;
     common_shape_.DataSpaceOrder[id] = shape_->DataSpaceOrder.at(kv.first);
     common_shape_.IsReadWriteDataSpace[id] = shape_->IsReadWriteDataSpace.at(kv.first);

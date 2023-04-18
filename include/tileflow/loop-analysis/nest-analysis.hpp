@@ -12,6 +12,7 @@
 #include "tileflow/common.hpp"
 #include "tileflow/problem/problem.hpp"
 #include "tileflow/loop-analysis/memory-state.hpp"
+#include "tileflow/mapper/expr.hpp"
 
 using mapping::TileFlow::Node;
 using mapping::TileFlow::OpNode;
@@ -34,10 +35,6 @@ namespace TileFlow {
 
     struct NodeConfig {
         // problem::Workload workload;
-        // tensors cause transfer by read (to lower level)
-        std::vector<problem::Shape::DataSpaceID> active_read_tensors;
-        // tensor that cause transfer by fill (to upper level)
-        std::vector<problem::Shape::DataSpaceID> active_fill_tensors;
         loop::Nest loop_nest;
         std::vector<problem::OperationPoint> vector_strides_;
         std::vector<problem::OperationPoint> mold_low_;
@@ -63,19 +60,11 @@ namespace TileFlow {
         const model::Engine::Specs& arch_specs_;
         const model::Topology& topology_;
         const problem::Workload& common_workload_;
+        const SymbolTable* symb_table_ = nullptr;
 
         std::uint64_t cycle_;
         double energy_;
         
-        void add_access_pattern(
-            problem::Shape::DataSpaceID producer_id, 
-            const Node* producer, 
-            problem::Shape::DataSpaceID consumer_id,
-            const Node* consumer);
-        /**
-         * \brief Swap the spatial node and its scope child
-        */
-        inline void swap_spatial_scope();
         /**
          * \brief sanity check
         */
@@ -94,10 +83,6 @@ namespace TileFlow {
          * \depends get_loopnest()
         */
         void get_dimscale();
-        /**
-         * \brief get alive tensors for Tile Nodes
-        */
-        void get_active_tensors();
         /**
          * \brief set the storage level for tile nodes;
         */
@@ -127,7 +112,8 @@ namespace TileFlow {
         NestAnalysis(const problem::TileFlow::Workloads& workloads_, 
             const mapping::TileFlow::Mapping& mapping_, 
             const model::Engine::Specs& arch_specs_, 
-            const model::Topology& topology_);
+            const model::Topology& topology_, 
+            const SymbolTable* symb_table_ = nullptr);
         
         const tiling::CompoundTile& get_tile(const Node* node) const 
             {
@@ -142,6 +128,8 @@ namespace TileFlow {
         void Print();
         void Report();
         void Export(const std::string& filename);
+        std::uint64_t get_cycle() const {return cycle_;}
+        double get_energy() const {return energy_;}
         friend class Displayer;
         friend class DatamovementCalculator;
         friend class DimScaleCalculator;
@@ -317,30 +305,6 @@ namespace TileFlow {
         
     };
 
-    class CollectOpNode: public mapping::TileFlow::Visitor {
-        void visitOp(const OpNode*) override;
-        std::vector<const OpNode*> opnodes_;
-    public: 
-        std::vector<const OpNode*> collectOpNodes(Node*);
-    };
-    
-    class CollectTileNode: public mapping::TileFlow::Visitor {
-        void visitTile(const TileNode* node) override {
-            if (node->get_tile_type() == type_)
-                nodes_.push_back(node);
-            for (auto child: node->get_children())
-                child->accept(this);
-        }
-        std::vector<const TileNode*> nodes_;
-        TileNode::type_t type_;
-    public: 
-        CollectTileNode(TileNode::type_t type = TileNode::Temporal): type_(type){}
-        std::vector<const TileNode*> operator() (const Node*root){
-            root->accept(this);
-            return nodes_;
-        }
-    };
-
     class Displayer: public mapping::TileFlow::Visitor {
         NestAnalysis & analysis_;
         void visitTile(const TileNode*) override;
@@ -398,23 +362,6 @@ namespace TileFlow {
         }
     };
 
-    /**
-     * rule1: Tiling fators's multiplication should be equal to the shape;
-     * rule2: Spatial TileNode's child must be a Temporal Tile Node
-     * rule3: each level should have at most one temporal tile node;
-    */
-    class SanityChecker: public mapping::TileFlow::Visitor {
-        std::unordered_map<int, int> scales_;
-        unsigned storage_level_;
-        void visitTile(const TileNode*) override;
-        void visitScope(const ScopeNode*) override;
-        void visitOp(const OpNode*) override; 
-        NestAnalysis& analysis_;
-    public: 
-        SanityChecker(NestAnalysis& analysis_): analysis_(analysis_){}
-        void run(const Node*) override; 
-    };
-
     class SpatialOffsetsCalculator: public mapping::TileFlow::Visitor {
     public:
         struct offset_t {
@@ -446,9 +393,7 @@ namespace TileFlow {
         expansion_(1,1) {}
     };
 
-    class SpatialScopeSwapper: public mapping::TileFlow::Visitor {
-        void visitScope(const ScopeNode*) override;
-    };
+    
 
 } // namespace TileFlow 
 

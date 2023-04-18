@@ -8,6 +8,10 @@
 #include "tileflow/problem/problem.hpp"
 #include "tileflow/mapping/loop.hpp"
 #include "tileflow/common.hpp"
+#include "tileflow/mapper/expr.hpp"
+
+
+using TileFlow::SymbolTable;
 
 namespace mapping {
 
@@ -30,6 +34,11 @@ public:
     virtual void run (const Node*);
 };
 
+struct ActiveTensor {
+    std::vector<problem::Shape::DataSpaceID> 
+    read_tensors, fill_tensors, update_tensors, wb_tensors;
+};
+
 class Node {
 public: 
     enum type_t{
@@ -42,11 +51,14 @@ protected:
     mutable const Node* parent_ = nullptr;
     std::vector<const Node*> children_;
     std::string storage_level_name_;
-    unsigned storage_level_;
+    unsigned storage_level_ = unsigned(-1);
+
+    mutable ActiveTensor active_tensors_;
 
     void ParseStorageLevel(config::CompoundConfigNode config);
     std::unordered_map<std::string, std::pair<int, int> > ParseFactors(const std::string & factors);
     std::vector<std::string> ParsePermutations(const std::string& buffer);
+    void display_active_tensors(std::string prefix) const;
 
 public: 
     Node(type_t t_): type_(t_) {}
@@ -54,7 +66,18 @@ public:
     unsigned get_storage_level() const {return storage_level_;}
     std::string get_storage_name() const {return storage_level_name_;}
     type_t get_type() const {return type_;}
-    void add_child(const Node* child) {assert(child != nullptr); children_.push_back(child); child->set_parent(this);}
+
+    ActiveTensor& get_active_tensors() const {return active_tensors_;}
+    
+    void add_child(const Node* child) {
+        if (type_ == Node::Scope) {
+            assert(storage_level_ == unsigned(-1) || storage_level_ == child->get_storage_level());
+            storage_level_ = child->get_storage_level();
+            storage_level_name_ = child->get_storage_name();
+        }
+        assert(child != nullptr); 
+        children_.push_back(child); 
+        child->set_parent(this);}
     void replace_child(const Node* old_child, const Node* new_child){
         auto iter = find(children_.begin(), children_.end(), old_child);
         if (iter != children_.end()) {
@@ -124,7 +147,7 @@ public:
     bool is_multicast_enabled() const {return multicast_enabled_;}
     TileNode::type_t get_tile_type() const {return type_;}
     
-    loop::Nest constructLoopNest() const;
+    loop::Nest constructLoopNest(const SymbolTable* symbol_table = nullptr) const;
     size_t n_level() const {return loopnests_.size();}
     const std::vector<loop::TileFlow::Descriptor>& get_loops() const {return loopnests_;}
 };
@@ -133,13 +156,10 @@ class OpNode: public Node {
     std::string name_;
     int op_index_;
     std::shared_ptr<problem::TileFlow::Workload> p_workload;
-    // op dimension --> runtime iteration
-    std::unordered_map<std::string, std::string> binding_; 
 public:
     OpNode(config::CompoundConfigNode config);
     void display(std::string prefix, bool recursive) const override;
     const std::string & get_name() const {return name_;}
-    const std::unordered_map<std::string, std::string>& get_binding() const {return binding_;}
     void accept(Visitor* visitor) const {visitor->visitOp(this);}
     const std::shared_ptr<problem::TileFlow::Workload>& get_workload() const {return p_workload;}
 };
@@ -148,12 +168,42 @@ struct Mapping {
     std::map<unsigned, std::uint64_t> fanoutX_map;
     std::map<unsigned, std::uint64_t> fanoutY_map;  
     Node * root = nullptr;
-    void Print();
+    void Print() const;
 };
 
 Mapping ParseAndConstruct(config::CompoundConfigNode config,
                           model::Engine::Specs& arch_specs,
                           const problem::TileFlow::Workloads& workload);
+
+class CollectOpNode: public mapping::TileFlow::Visitor {
+    void visitOp(const OpNode* node) override {
+        opnodes_.push_back(node);
+    }
+    std::vector<const OpNode*> opnodes_;
+public: 
+    std::vector<const OpNode*> collectOpNodes(Node* root){
+        opnodes_.clear();
+        root->accept(this);
+        return std::move(opnodes_);
+    }
+};
+    
+class CollectTileNode: public mapping::TileFlow::Visitor {
+    void visitTile(const TileNode* node) override {
+        if (node->get_tile_type() == type_)
+            nodes_.push_back(node);
+        for (auto child: node->get_children())
+            child->accept(this);
+    }
+    std::vector<const TileNode*> nodes_;
+    TileNode::type_t type_;
+public: 
+    CollectTileNode(TileNode::type_t type = TileNode::Temporal): type_(type){}
+    std::vector<const TileNode*> operator() (const Node*root){
+        root->accept(this);
+        return nodes_;
+    }
+};
 
 }  // namespace TileFlow  
 } // namespace mapping

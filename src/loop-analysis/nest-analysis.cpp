@@ -14,25 +14,15 @@ namespace analysis
             (getenv("TIMELOOP_DISABLE_TEMPORAL_EXTRAPOLATION") == NULL) ||
             (strcmp(getenv("TIMELOOP_DISABLE_TEMPORAL_EXTRAPOLATION"), "0") == 0);
 
-        std::vector<const OpNode *> CollectOpNode::collectOpNodes(Node *root)
-        {
-            opnodes_.clear();
-            root->accept(this);
-            return std::move(opnodes_);
-        }
-
-        void CollectOpNode::visitOp(const OpNode *node)
-        {
-            opnodes_.push_back(node);
-        }
-
         NestAnalysis::NestAnalysis(
             const problem::TileFlow::Workloads& workloads_, 
             const mapping::TileFlow::Mapping& mapping_, 
             const model::Engine::Specs& arch_specs_, 
-            const model::Topology& topology_)
+            const model::Topology& topology_, 
+            const SymbolTable* symb_table_)
             : workloads_(workloads_), mapping_(mapping_), arch_specs_(arch_specs_), 
-            topology_(topology_), common_workload_(workloads_.get_workload()){
+            topology_(topology_), common_workload_(workloads_.get_workload()), 
+            symb_table_(symb_table_){
             if (verbose_level) {
                 std::cout << "begin analysis...";
                 common_workload_.Show();
@@ -47,25 +37,12 @@ namespace analysis
 
         void NestAnalysis::analyze()
         {
-            swap_spatial_scope();
-            sanity_check();
             get_loopnest();
             get_dimscale();
-            get_active_tensors();
             get_storage_level();
             get_spatial_offsets();
             get_expansion();
             get_datamovement();
-        }
-
-        void NestAnalysis::swap_spatial_scope() {
-            SpatialScopeSwapper pass;
-            pass.run(mapping_.root);
-        }
-
-        void NestAnalysis::sanity_check() {
-            SanityChecker pass(*this);
-            pass.run(mapping_.root);
         }
 
         void NestAnalysis::get_storage_level() {
@@ -89,101 +66,6 @@ namespace analysis
             RetVal ret = dm.eval(mapping_.root);
             cycle_ = ret.cycle_ + topology_.total_network_latency_;
             energy_ = dm.Energy();
-        }
-
-        void NestAnalysis::get_active_tensors()
-        {
-            std::vector<const OpNode *> opnodes = CollectOpNode().collectOpNodes(mapping_.root);
-            std::unordered_map<std::string, const Node *> tensor2producer;
-            for (auto &t : workloads_.get_ins())
-            {
-                tensor2producer[t] = mapping_.root;
-            }
-
-            std::unordered_map<const Node *, std::vector<problem::Shape::DataSpaceID>> access_pattern;
-
-            for (auto node : opnodes)
-            {
-                auto &ptr = node->get_workload();
-                for (auto &t : ptr->get_ins())
-                {
-                    TILEFLOW_ASSERT(tensor2producer.count(t), "Op " << node->get_name() << "'s input " << t << " is unclear");
-                    auto producer = tensor2producer[t];
-                    problem::Shape::DataSpaceID producer_id = producer->get_type() == Node::Op ? 
-                        workloads_.get_shape().DataSpaceNameToID.at(static_cast<const OpNode *>(producer)->get_name() + "::" + t) :
-                        problem::Shape::DataSpaceID(-1);
-                    problem::Shape::DataSpaceID consumer_id = workloads_.get_shape().DataSpaceNameToID.at(node->get_name() + "::" + t);
-                    add_access_pattern(producer_id, producer, consumer_id, node);
-                }
-                tensor2producer[ptr->get_out()] = node;
-            }
-
-            for (auto &t : workloads_.get_outs())
-            {
-                TILEFLOW_ASSERT(tensor2producer.count(t), "Output " << t << " is unclear");
-                auto producer_op_name = static_cast<const OpNode *>(tensor2producer[t])->get_name();
-                int id = workloads_.get_shape().DataSpaceNameToID.at(producer_op_name + "::" + t);
-                add_access_pattern(id, tensor2producer[t], problem::Shape::DataSpaceID(-1), mapping_.root);
-            }
-        }
-
-        void NestAnalysis::add_access_pattern(
-            problem::Shape::DataSpaceID producer_id,
-            const Node *producer,
-            problem::Shape::DataSpaceID consumer_id,
-            const Node *consumer)
-        {
-            
-            std::stack<const Node *> sp, sc;
-            while (producer)
-            {
-                sp.push(producer);
-                producer = producer->get_parent();
-            }
-            while (consumer)
-            {
-                sc.push(consumer);
-                consumer = consumer->get_parent();
-            }
-            std::stack<const Node *> common;
-            while (!sc.empty() && !sp.empty() && sc.top() == sp.top())
-            {
-                common.push(sc.top());
-                sc.pop();
-                sp.pop();
-            }
-
-            // adds common to read active tensors
-            while (!common.empty())
-            {
-                auto node = common.top();
-                common.pop();
-                if (consumer_id != problem::Shape::DataSpaceID(-1))
-                    configs[node].active_read_tensors.push_back(consumer_id);
-                if (producer_id != problem::Shape::DataSpaceID(-1))
-                    configs[node].active_read_tensors.push_back(producer_id);
-                if (node->get_type() == Node::type_t::Tile && 
-                    static_cast<const TileNode *>(node)->get_tile_type() == TileNode::Temporal)
-                    break;
-            }
-
-            if (consumer_id != problem::Shape::DataSpaceID(-1))
-                while (!sc.empty())
-                {
-                    auto node = sc.top();
-                    configs[node].active_read_tensors.push_back(consumer_id);
-                    configs[node].active_fill_tensors.push_back(consumer_id);
-                    sc.pop();
-                }
-
-            if (producer_id != problem::Shape::DataSpaceID(-1))
-                while (!sp.empty())
-                {
-                    auto node = sp.top();
-                    configs[node].active_read_tensors.push_back(producer_id);
-                    configs[node].active_fill_tensors.push_back(producer_id);
-                    sp.pop();
-                }
         }
 
         void NestAnalysis::get_dimscale()
@@ -231,15 +113,6 @@ namespace analysis
             if (configs_.count(node))
             {
                 auto &config = configs_[node];
-                auto& shape = analysis_.workloads_.get_shape();
-                std::cout << prefix_ << "read tensors:";
-                for (auto id : config.active_read_tensors)
-                    std::cout << shape.DataSpaceIDToName.at(id) << ",";
-                std::cout << std::endl;
-                std::cout << prefix_ << "fill tensors:";
-                for (auto id : config.active_fill_tensors)
-                    std::cout << shape.DataSpaceIDToName.at(id) << ",";
-                std::cout << std::endl;
                 std::cout << prefix_ << "storage:" << node->get_storage_name();
                 std::cout << ", fanout:" << config.fanout_x << "," << config.fanout_y << std::endl;
                 std::cout << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
@@ -311,14 +184,6 @@ namespace analysis
                     << kv.second.compute_info_.replication_factor << ",";
             }
             auto& compute_info = analysis_.tiles_.at(node).compute_info;
-            std::cout << std::endl;
-            std::cout << "active_read_tensors:";
-            for (auto pv: config.active_read_tensors) 
-                std::cout << problem::GetShape()->DataSpaceIDToName.at(pv) << ",";
-            std::cout << std::endl;
-            std::cout << "active_fill_tensors:";
-            for (auto pv: config.active_fill_tensors) 
-                std::cout << problem::GetShape()->DataSpaceIDToName.at(pv) << ",";
             std::cout << std::endl;
             std::cout << prefix_<< "repFactor:" << compute_info.replication_factor << std::endl;
             std::cout << prefix_<< "accesses:" << compute_info.accesses << std::endl;
@@ -702,7 +567,6 @@ namespace analysis
                 {
                     arch_storage_level_[loop_level] = storage_level;
                 }
-
                 storage_level++;
             }
         }
@@ -713,9 +577,12 @@ namespace analysis
             problem::OperationSpace point_set = GetCurrentWorkingSet(nest_state_.rbegin());
             
             // We need to mask out the unused tensor from the point_set
-            auto & active_tensors = config_.active_read_tensors;
+            auto &read_tensors = input_.curr_node_->get_active_tensors().read_tensors;
+            auto &update_tensors = input_.curr_node_->get_active_tensors().update_tensors;
+
             for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++) {
-                if (find(active_tensors.begin(), active_tensors.end(), pv) == active_tensors.end()) 
+                if (find(read_tensors.begin(), read_tensors.end(), pv) == read_tensors.end() 
+                && find(update_tensors.begin(), update_tensors.end(), pv) == update_tensors.end()) 
                     point_set.GetDataSpace(pv).Reset();
             }
             
@@ -1286,16 +1153,22 @@ namespace analysis
 
         void PerfectLoopnestAnalyzer::ComputeReadUpdate(
             tiling::CompoundTile& tile) {
+            
             for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces; 
-                ++pv) {
-                auto& info = tile.data_movement_info[pv];
+                ++pv){
+                auto & info = tile.data_movement_info[pv];
+                info.reads = info.updates = info.temporal_reductions = 0;
+            }
+
+            for (auto pv: input_.curr_node_->get_active_tensors().read_tensors) {
+                auto & info = tile.data_movement_info[pv];
                 info.reads = std::round(info.content_accesses + info.peer_accesses);
-                
-                info.updates = info.temporal_reductions = 0;
-                if (problem::GetShape()->IsReadWriteDataSpace.at(pv)) {
-                    info.updates = std::round(info.content_accesses);
-                    info.temporal_reductions = std::round(info.content_accesses + info.peer_accesses);
-                }
+            }
+
+            for (auto pv: input_.curr_node_->get_active_tensors().update_tensors) {
+                auto & info = tile.data_movement_info[pv];
+                info.updates = std::round(info.content_accesses);
+                info.temporal_reductions = std::round(info.content_accesses + info.peer_accesses);
             }
         }
 
@@ -1324,7 +1197,7 @@ namespace analysis
                     info[pv].parent_access_share = 0;
                 }
             
-            for (auto pv: config_.active_fill_tensors) {
+            for (auto pv: input_.curr_node_->get_active_tensors().fill_tensors) {
                 auto & pv_info = info[pv];
                 for (auto& x: access_stats.at(pv).stats){
                     auto multicast_factor = x.first.first;
@@ -1375,103 +1248,6 @@ namespace analysis
 
                 info.fine_grained_data_accesses["random_fill"] = info.fills;
             }
-        }
-
-        void SanityChecker::run(const Node* root){
-            for (auto& kv: problem::GetShape()->FactorizedDimensionIDToName)
-                scales_[kv.first] = 1;
-            storage_level_ = analysis_.arch_specs_.topology.NumStorageLevels();
-            root->accept(this);
-        }
-
-        void SanityChecker::visitTile(const TileNode* node){
-            auto old_scales = scales_;
-            auto old_storage_level = storage_level_;
-            TILEFLOW_ASSERT(node->get_tile_type() != TileNode::Spatial || 
-                node->get_storage_level() == storage_level_, 
-                "bad spatial tile level at " << node->get_storage_name() 
-                << ", should be the same with upper temporal node.");
-            TILEFLOW_ASSERT(node->get_tile_type() != TileNode::Temporal ||
-                node->get_storage_level() == (--storage_level_), 
-                "duplicate temporal tile for storage level " << node->get_storage_name()
-                << "," << node->get_storage_level() << ":" << storage_level_);
-            for(auto loop: node->get_loops()) {
-                scales_[loop.dimension] *= 1 + ((loop.end - 1 - loop.start) /
-                                           loop.stride);    
-            }
-            auto& children = node->get_children();
-            TILEFLOW_ASSERT(children.size() == 1, "Tile node should have at only child.");
-            auto child = children.front();
-            child->accept(this);
-            scales_ = old_scales;
-            storage_level_ = old_storage_level;
-
-
-            if (node->get_tile_type() == TileNode::Spatial){
-                TILEFLOW_ASSERT(child->get_type() == Node::Tile, 
-                "Spatial's child must be temporal tile.");
-                TILEFLOW_ASSERT(static_cast<const TileNode*>(child)->get_tile_type() == TileNode::Temporal, 
-                "Spatial's child must be temporal tile.");
-            }
-
-        }
-        
-        void SanityChecker::visitScope(const ScopeNode* node){
-            auto& children = node->get_children();
-            TILEFLOW_ASSERT(children.size() > 1, "Scope node should have more than one child.");
-            for (auto child: children) child->accept(this);
-        }
-
-        void SanityChecker::visitOp(const OpNode* node) {
-            auto& workload = analysis_.common_workload_;
-            for(auto& kv: node->get_workload()->GetShape()->FactorizedDimensionNameToID){
-                int dim = problem::GetShape()->FactorizedDimensionNameToID.at(kv.first);
-                auto scale = scales_.at(dim);
-                int scale_ = workload.GetFactorizedBound(dim);
-                TILEFLOW_ASSERT(scale == scale_, 
-                    "Mapping/Instance mimatch for dim " << kv.first << 
-                    ": " << scale << "!=" << scale_ 
-                     << " for " << kv.first);
-            }
-            TILEFLOW_ASSERT(storage_level_ == 0, 
-            " missing temporal tiles for storage level under " << storage_level_);
-        } 
-
-        void SpatialScopeSwapper::visitScope(const ScopeNode* node){
-            auto parent = node->get_parent();
-            if (parent && parent->get_type() == Node::Tile) {
-                auto parent_ = static_cast<const TileNode*>(parent);
-                if (parent_->get_tile_type() == TileNode::Spatial) {
-                    TILEFLOW_ASSERT(node->get_scope_type() == ScopeNode::Sequential
-                    || node->get_scope_type() == ScopeNode::Sharing, 
-                    "A spatial tile's child cannot be a parallel/pipeline scope");
-                    
-                    auto node_ = const_cast<ScopeNode*>(node);
-                    
-                    std::vector<const Node*> new_nodes;
-                    for (auto child: node_->get_children()) {
-                        Node * new_node = new TileNode(*parent_);
-                        assert(new_node);
-                        new_nodes.push_back(new_node);
-                        new_node->reset_children();
-                        new_node->set_parent(node_);
-                        new_node->add_child(child);
-                    }
-
-                    node_->set_children(new_nodes);
-                    node_->set_parent(parent_->get_parent());
-
-                    if (parent_->get_parent()) {
-                        const_cast<Node*>(parent_->get_parent())->replace_child(parent_, node_);
-                    }
-
-                    // erase all child for safe deconstruct 
-                    const_cast<TileNode*>(parent_)->reset_children();
-                    delete parent_;
-                }
-            }
-            for (auto child: node->get_children())
-                child->accept(this);
         }
 
     } // namespace TileFlow

@@ -1,0 +1,15 @@
+macro:
+  M: 512 
+  N: 64 
+  K: 64
+  L: 512 
+  MO: 4
+  MM: 8
+  NM: 4
+  KM: 4 
+  LM: 512
+verbose: 2
+# M = MO * MM * 16 
+# N = NO * NM * 16 
+# K = KO * KM * 16 
+# L = LO * LM 
