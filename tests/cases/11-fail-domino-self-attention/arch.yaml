@@ -1,0 +1,31 @@
+architecture:
+  version: 0.2
+  subtree:
+  - name: System
+    attributes:
+    local:
+    - name: L1
+      class: DRAM
+      attributes:
+        width: 512
+        word-bits: 16
+        block-size: 32
+        technology: 45
+        sizeKB: 2000
+    subtree:
+    - name: PE
+      attributes:
+      local:
+      - name: L0[0..1023]
+        class: regfile
+        attributes:
+          width: 16
+          meshX: 1024
+          word-bits: 16
+          technology: 16nm
+          read_bandwidth: 64
+          sizeKB: 200
+      - name: mac[0..1023]
+        class: intmac
+        attributes:
+          meshX: 1024
