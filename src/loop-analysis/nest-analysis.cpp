@@ -24,7 +24,7 @@ namespace analysis
             topology_(topology_), common_workload_(workloads_.get_workload()), 
             symb_table_(symb_table_){
             if (verbose_level) {
-                std::cout << "begin analysis...";
+                std::cout << "begin analysis..." << std::endl;
                 common_workload_.Show();
             }
             problem::Workload::SetCurrShape(common_workload_.GetShape());
@@ -253,8 +253,8 @@ namespace analysis
                 storage_level = std::max(storage_level, storage_levels_.top());
                 storage_levels_.pop();
             }
-            config.fanout_x = analysis_.mapping_.fanoutX_map.at(config.storage_level);
-            config.fanout_y = analysis_.mapping_.fanoutY_map.at(config.storage_level);
+            config.fanout_x = analysis_.mapping_.fanoutX_map.at(node->get_storage_level());
+            config.fanout_y = analysis_.mapping_.fanoutY_map.at(node->get_storage_level());
             storage_levels_.push(storage_level);
         }
 
@@ -267,8 +267,8 @@ namespace analysis
             auto& config = analysis_.configs[node];
             config.storage_level = node->get_storage_level();
             if (node->is_spatial()) {
-                config.fanout_x = analysis_.mapping_.fanoutX_map.at(config.storage_level);
-                config.fanout_y = analysis_.mapping_.fanoutY_map.at(config.storage_level);
+                config.fanout_x = analysis_.mapping_.fanoutX_map.at(node->get_storage_level());
+                config.fanout_y = analysis_.mapping_.fanoutY_map.at(node->get_storage_level());
             }
             else config.fanout_x = config.fanout_y = 1;
             storage_levels_.push(config.storage_level);
@@ -354,6 +354,7 @@ namespace analysis
             // std::cout << "input:" << init_offset << std::endl;
             // std::cout << "output: " << output_offset << std::endl;
             // std::cout << "fanout: " << config.fanout_x << "," << config.fanout_y << std::endl;
+            // std::cout << "storage_level:" << node->get_storage_name() << ", " << node->get_name() << ", " << node->get_storage_level() << std::endl;
             // std::cout << "======================================" << std::endl;
             assert(output_offset.y <= config.fanout_y);
             assert(output_offset.max_x <= config.fanout_x);

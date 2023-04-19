@@ -6,6 +6,42 @@ namespace mapping {
     
 namespace TileFlow {
 
+const std::unordered_map<Node::type_t, std::string> Node::type2name_ = {
+    {Node::Tile, "Tile"},
+    {Node::Op, "Op"},
+    {Node::Scope, "Scope"}
+};
+
+void Node::add_child(const Node* child){
+    if (type_ == Node::Scope) {
+        
+        unsigned storage_level;
+        std::string storage_level_name = "Unknown";
+        if (child->get_type() == Node::Tile) {
+            if (static_cast<const TileNode*>(child)->get_tile_type() == TileNode::Temporal){
+                storage_level = child->get_storage_level() + 1;
+            }
+            else {
+                storage_level = child->get_storage_level();
+                storage_level_name = child->get_storage_name();
+            }
+        }
+        else if (child->get_type() == Node::Scope) {
+            storage_level = child->get_storage_level();
+            storage_level_name = child->get_storage_name();
+        }
+        else {
+            TILEFLOW_ERROR("Scope Node should not have a op child");
+        }
+        assert(storage_level_ == unsigned(-1) || storage_level_ == storage_level);
+        storage_level_ = storage_level;
+        storage_level_name_ = storage_level_name;
+    }
+    assert(child != nullptr); 
+    children_.push_back(child); 
+    child->set_parent(this);
+}
+
 void Visitor::visitScope(const ScopeNode* node){
     for (auto child: node->children_) 
         child->accept(this);

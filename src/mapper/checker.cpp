@@ -1,6 +1,9 @@
 #include <stack>
 
 #include "tileflow/mapper/checker.hpp"
+#include "tileflow/mapper/op.hpp"
+
+using namespace TileFlow::Op;
 
 namespace TileFlow {
 
@@ -15,8 +18,7 @@ void ShapeConstraintParser::visitTile(const TileNode* node){
             expr.first *= loop.end;
         }
         else {
-            expr.second.push_back(
-                std::make_shared<VariableExpr>(loop.end));
+            expr.second.push_back(variable(loop.end));
         }
     }
     for (auto child:node->get_children()) child->accept(this);
@@ -43,11 +45,10 @@ void ShapeConstraintParser::visitOp(const OpNode* node) {
             << scale << "v.s." << expr.first);
         }
         else {
-            constraints.push_back({std::make_shared<CondExpr>(
-                std::make_shared<ProductExpr>(expr.second),
-                std::make_shared<ParameterExpr>(scale / expr.first), 
-                CondExpr::EQU), 
-            " loopcount constraint for tiling of dim " + kv.first});
+            constraints.push_back({
+                product(expr.second) == parameter(scale / expr.first),
+                " loopcount constraint for tiling of dim " + kv.first
+            });
         }
     }
 }
@@ -105,6 +106,7 @@ void Checker::check(){
     get_shape_constraints();
     // this depends on get_active_tensors;
     get_memory_constraints();
+    get_resource_constraints();
 }
 
 void Checker::get_active_tensors(){
@@ -251,6 +253,12 @@ void Checker::get_memory_constraints() {
     constraints.insert(constraints.end(), cons.begin(), cons.end());
 }
 
+void Checker::get_resource_constraints() {
+    ResourceConstraintParser parser(mapping_);
+    auto cons = parser.parse(mapping_.root);
+    constraints.insert(constraints.end(), cons.begin(), cons.end());
+}
+
 std::shared_ptr<Expr> MemoryConstraintParser::cal_footprint(unsigned pv) {
     std::vector<std::shared_ptr<Expr>> prod;
     for (unsigned data_space_dim = 0; data_space_dim < problem::GetShape()->DataSpaceOrder.at(pv); 
@@ -270,23 +278,23 @@ std::shared_ptr<Expr> MemoryConstraintParser::cal_footprint(unsigned pv) {
             coeff *= factors_[term.second].first;
             std::vector<std::shared_ptr<Expr> > exprs;
             if (coeff != 1) {
-                exprs.push_back(std::make_shared<ParameterExpr>(coeff));
+                exprs.push_back(parameter(coeff));
             }
             if (factor.second.size() == 1) {
-                exprs.push_back(std::make_shared<VariableExpr>(factor.second.front()));
+                exprs.push_back(variable(factor.second.front()));
             }
             else {
                 for (auto id: factor.second)
-                    exprs.push_back(std::make_shared<VariableExpr>(id));
+                    exprs.push_back(variable(id));
             }
             if (exprs.size() == 1) sum.push_back(exprs.front());
-            else sum.push_back(std::make_shared<ProductExpr>(exprs));
+            else sum.push_back(product(exprs));
         }
         if (sum.size() == 1) prod.push_back(sum.front());
-        else prod.push_back(std::make_shared<SumExpr>(sum));
+        else prod.push_back(Op::sum(sum));
     }
     if (prod.size() == 1) return prod.front();
-    return std::make_shared<ProductExpr>(prod);
+    return product(prod);
 }
 
 void MemoryConstraintParser::visitTile(
@@ -300,27 +308,8 @@ void MemoryConstraintParser::visitTile(
         else factor.second.push_back(loop.end);
     }
 
-    if (node->get_tile_type() == TileNode::Temporal && 
-    topology_.GetStorageLevel(node->get_storage_level())->GetSpecs().size.IsSpecified()) {
-        std::set<int> active_tensors;
-        active_tensors.insert(node->get_active_tensors().read_tensors.begin(), 
-            node->get_active_tensors().read_tensors.end());
-        active_tensors.insert(node->get_active_tensors().update_tensors.begin(), 
-            node->get_active_tensors().update_tensors.end());
-        std::vector<std::shared_ptr<Expr> > operands;
-        for (auto pv: active_tensors)
-            operands.push_back(cal_footprint(pv));
-        
-        std::shared_ptr<Expr> footprints = operands.front();
-        if (operands.size() > 1) {
-            footprints = std::make_shared<SumExpr>(operands); 
-        }
-        constraints_.push_back({std::make_shared<CondExpr>(
-            footprints,
-            std::make_shared<ParameterExpr>(
-                (int)topology_.GetStorageLevel(node->get_storage_level())->GetSpecs().size.Get()),
-            CondExpr::LEQ
-        ), "Tile node memory constraint at " + node->get_storage_name()});
+    if (node->get_tile_type() == TileNode::Temporal) {
+        add_constraint(node);
     }
 }
 
@@ -332,33 +321,32 @@ void MemoryConstraintParser::visitOp(
     for (auto& factor: factors_) factor.first = 1;
 }
 
+void MemoryConstraintParser::add_constraint(const Node* node) {
+    auto& size = topology_.GetStorageLevel(node->get_storage_level())->GetSpecs().size;
+    if (!size.IsSpecified()) return;
+    std::set<int> active_tensors;
+    active_tensors.insert(node->get_active_tensors().read_tensors.begin(), 
+        node->get_active_tensors().read_tensors.end());
+    active_tensors.insert(node->get_active_tensors().update_tensors.begin(), 
+        node->get_active_tensors().update_tensors.end());
+    std::vector<std::shared_ptr<Expr> > footprints;
+    for (auto pv: active_tensors)
+        footprints.push_back(cal_footprint(pv));
+    
+    constraints_.push_back({
+        Op::sum(footprints) <= parameter(size.Get()),
+        "Memory constraint at " + node->get_name()
+    });
+}
+
 void MemoryConstraintParser::visitScope(
     const ScopeNode* node 
 ) {
     for (auto child: node->get_children()){
         child->accept(this);
     }
-    if (node->get_scope_type() == ScopeNode::Sharing
-    && topology_.GetStorageLevel(node->get_storage_level())->GetSpecs().size.IsSpecified()) {
-        std::set<int> active_tensors;
-        active_tensors.insert(node->get_active_tensors().read_tensors.begin(), 
-            node->get_active_tensors().read_tensors.end());
-        active_tensors.insert(node->get_active_tensors().update_tensors.begin(), 
-            node->get_active_tensors().update_tensors.end());
-        std::vector<std::shared_ptr<Expr> > operands;
-        for (auto pv: active_tensors)
-            operands.push_back(cal_footprint(pv));
-        
-        std::shared_ptr<Expr> footprints = operands.front();
-        if (operands.size() > 1) {
-            footprints = std::make_shared<SumExpr>(operands); 
-        }
-        constraints_.push_back({std::make_shared<CondExpr>(
-            footprints,
-            std::make_shared<ParameterExpr>(
-                (int)topology_.GetStorageLevel(node->get_storage_level())->GetSpecs().size.Get()),
-            CondExpr::LEQ
-        ), "Sharing Scope constraint at " + node->get_storage_name()});
+    if (node->get_scope_type() == ScopeNode::Sharing) {
+        add_constraint(node);
     }
 }
 
@@ -408,5 +396,58 @@ void SanityChecker::visitOp(const OpNode* ) {
     TILEFLOW_ASSERT(storage_level_ == 0, 
     " missing temporal tiles for storage level under " << storage_level_);
 } 
+
+void ResourceConstraintParser::visitTile(const TileNode* node) {
+    for (auto child: node->get_children()) child->accept(this);
+
+    if (node->get_tile_type() == TileNode::Spatial) {
+        std::pair<int, std::vector<int> > xs, ys;
+        xs.first = ys.first = 1;
+        for (auto& loop: node->get_loops()) {
+            auto& tmp_ = loop::IsSpatialX(loop.spacetime_dimension)? xs:ys;
+            if (loop.end <= 0) 
+                tmp_.second.push_back(loop.end);
+            else tmp_.first *= loop.end;
+        }
+        core_usage_ = pair(product(xs), product(ys));
+    }
+    else {
+        core_usage_ = pair(1,1);
+    }
+
+    add_constraint(node);
+}
+
+void ResourceConstraintParser::visitScope(const ScopeNode* node) {
+
+    std::vector<std::shared_ptr<ResourceExpr> > exprs;
+    for (auto child: node->get_children()) {
+        child->accept(this);
+        exprs.push_back(core_usage_);
+    }
+
+    auto scope_type = node->get_scope_type();
+    core_usage_ = (scope_type == ScopeNode::Sequential || 
+    scope_type == ScopeNode::Sharing)? Op::max(exprs):Op::sum(exprs);
+
+    add_constraint(node);
+}
+
+void ResourceConstraintParser::add_constraint(const Node* node) {
+    if (node->get_parent() == nullptr || 
+    (node->get_parent()->get_type() == Node::Tile &&
+    static_cast<const TileNode*>(node->get_parent())->get_tile_type() == TileNode::Temporal)) {
+        auto fanout_x = mapping_.fanoutX_map.at(node->get_storage_level());
+        auto fanout_y = mapping_.fanoutY_map.at(node->get_storage_level());
+        constraints_.push_back(
+            {core_usage_ <= Op::pair(fanout_x, fanout_y),
+            "Resource constraint at " + node->get_name()});
+    }
+}
+
+std::vector<Constraint> ResourceConstraintParser::parse(const Node* root) {
+    root->accept(this);
+    return constraints_;
+}
 
 } // namespace TileFlow 

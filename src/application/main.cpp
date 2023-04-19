@@ -111,11 +111,11 @@ int main(int argc, char* argv[])
 
   mapper.report();
 
-  if (root.exists("output")) {
-    std::string filename;
-    root.lookupValue("output", filename);
-    mapper.dump(filename);
-  }
+  // if (root.exists("output")) {
+  //   std::string filename;
+  //   root.lookupValue("output", filename);
+  //   mapper.dump(filename);
+  // }
   /*
   analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_, topology_);
   analysis.analyze();
