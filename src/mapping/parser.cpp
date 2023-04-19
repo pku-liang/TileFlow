@@ -26,21 +26,22 @@ ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope){
     tolower(type_s);
     if (type_s.find("seq") != std::string::npos) {
         type = Sequential;
+        name_ += "::Sequential";
     }
     else if (type_s.find("para") != std::string::npos) {
         type = Parallel;
+        name_ += "::Parallel";
     }
     else if (type_s.find("pipe") != std::string::npos) {
         type = Pipeline;
+        name_ += "::Pipeline";
     }
-<<<<<<< HEAD
-    else if (type_s.find("sharing") != std::string::npos ){
-=======
     else if (type_s.find("shar") != std::string::npos) {
->>>>>>> 28c0f1de14174a4c90b48a1de680f257fa2a631d
         type = Sharing;
+        name_ += "::Sharing";
     }
     else {TILEFLOW_ERROR("ScopeNode type error. Should has type sequential/parallel");}
+    
 
 }   
 
@@ -100,6 +101,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
         : spacetime::Dimension::Time; 
     }
     
+    name_ += type_ == Temporal? "::Temporal" : "::Spatial"; 
 }
 
 std::unordered_map<std::string, std::pair<int, int> > Node::ParseFactors(
@@ -193,8 +195,9 @@ void Node::ParseStorageLevel(config::CompoundConfigNode directive)
 }
 
 OpNode::OpNode(config::CompoundConfigNode config): Node(Node::Op) {
-    assert(config.lookupValue("name", name_));
-    p_workload = p_workloads_->get_workload(name_);
+    assert(config.lookupValue("name", op_name_));
+    p_workload = p_workloads_->get_workload(op_name_);
+    name_ += "::" + op_name_;
 }
 
 

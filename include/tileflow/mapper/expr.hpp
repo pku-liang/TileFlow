@@ -6,9 +6,11 @@
 #include <memory>
 
 namespace TileFlow {
+    typedef size_t num_t;
+
     struct Entry {
         std::string name_;
-        int value_;
+        num_t value_;
         int idx_;
     };
 
@@ -36,17 +38,75 @@ namespace TileFlow {
     extern SymbolTable global_symbol_table_;
 
     struct Expr {
-        virtual int eval(const SymbolTable&) = 0;
+        virtual num_t eval(const SymbolTable&) = 0;
         virtual void display(const SymbolTable&) = 0;
+    };
+
+    struct ResourceExpr: public Expr {
+        virtual num_t eval(const SymbolTable& ) override {return 0;}
+        virtual void display(const SymbolTable& ) override {}
+        // given y's limit, compute minimum required x
+        virtual std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) = 0;
+    };
+
+    struct PairExpr: public ResourceExpr {
+        std::shared_ptr<Expr> x_;
+        std::shared_ptr<Expr> y_;
+        PairExpr(const std::shared_ptr<Expr>& x, 
+            const std::shared_ptr<Expr>& y): x_(x), y_(y) {}
+        void display(const SymbolTable& symb_table) override;
+        std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
+    };
+
+    struct PairSumExpr: public ResourceExpr {
+        std::vector<std::shared_ptr<ResourceExpr> > operands_;
+        PairSumExpr(std::vector<std::shared_ptr<ResourceExpr> >& operands):
+            operands_(operands){}
+        void display(const SymbolTable& symb_table) override;
+        std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
+    };
+
+    struct PairMaxExpr: public ResourceExpr {
+        std::vector<std::shared_ptr<ResourceExpr> > operands_;
+        PairMaxExpr(std::vector<std::shared_ptr<ResourceExpr> >& operands):
+            operands_(operands){}
+        void display(const SymbolTable& symb_table) override;
+        std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
+    };
+
+    struct PairCondExpr: public ResourceExpr {
+        std::shared_ptr<ResourceExpr> expr_;
+        std::shared_ptr<ResourceExpr> limit_;
+        enum type_t {
+            LEQ
+        }op_;
+        PairCondExpr(
+            std::shared_ptr<ResourceExpr> expr,
+            std::shared_ptr<ResourceExpr> limit, 
+            type_t op): expr_(expr), limit_(limit), op_(op) {}
+        void display(const SymbolTable& symb_table) override;
+        num_t eval(const SymbolTable& symb_table) override;
+        std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
     };
 
     struct SumExpr: public Expr {
         std::vector<std::shared_ptr<Expr> > operands_;
         SumExpr(std::vector<std::shared_ptr<Expr> >& operands):
             operands_(operands){}
-        int eval(const SymbolTable& symb_table) override;
+        num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
     };
+
+    template <typename T> 
+    struct MaxExpr: public Expr {
+        std::vector<std::shared_ptr<T> > operands_;
+        MaxExpr(const std::vector<std::shared_ptr<T> >& operands):
+            operands_(operands){}
+        num_t eval(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table) override;
+    };
+
+
     struct ProductExpr: public Expr {
         std::vector<std::shared_ptr<Expr> > operands_;
         ProductExpr(const std::vector<std::shared_ptr<Expr> >& operands):
@@ -54,20 +114,21 @@ namespace TileFlow {
         ProductExpr(const std::initializer_list<std::shared_ptr<Expr> >& operands):
             operands_(operands){}
         ProductExpr(const std::vector<int>& operands);
-        int eval(const SymbolTable& symb_table) override;
+        ProductExpr(const std::pair<num_t, std::vector<int> >& operands);
+        num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
     };
     struct VariableExpr: public Expr {
         int idx_;
         VariableExpr(int idx): idx_(idx){}
-        int eval(const SymbolTable& symb_table) override;
+        num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
     };
 
     struct ParameterExpr: public Expr {
-        int value_;
-        ParameterExpr(int value): value_(value){}
-        int eval(const SymbolTable& symb_table) override;
+        num_t value_;
+        ParameterExpr(num_t value): value_(value){}
+        num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
     };
     
@@ -83,7 +144,8 @@ namespace TileFlow {
                 std::shared_ptr<Expr> right, 
                 CondExpr::type_t op):
         op_(op), left_(left), right_(right){}
-        int eval(const SymbolTable& symb_table) override;
+        num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
     };
+
 } // namespace TileFlow

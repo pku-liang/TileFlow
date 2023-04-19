@@ -40,12 +40,27 @@ namespace TileFlow {
         const problem::Workload& workload_;
         const model::Topology& topology_;
         std::vector<Constraint> constraints_;
+        void add_constraint(const Node*node);
     public:
         MemoryConstraintParser(
             const problem::Workload& workload, 
             const model::Topology& topology): 
             workload_(workload), topology_(topology){}
         std::vector<Constraint > parse(const Node*root);
+    };
+
+    class ResourceConstraintParser: public Visitor {
+        void visitTile(const TileNode*) override;
+        void visitScope(const ScopeNode*) override;
+        std::vector<Constraint> constraints_;
+        std::shared_ptr<ResourceExpr> core_usage_;
+        const mapping::TileFlow::Mapping& mapping_;
+        void add_constraint(const Node* node);
+    public:
+        ResourceConstraintParser(const mapping::TileFlow::Mapping& mapping):
+        mapping_(mapping) {}
+        std::vector<Constraint> parse(const Node*root);
+
     };
 
     class SpatialScopeSwapper: public mapping::TileFlow::Visitor {
@@ -79,6 +94,7 @@ namespace TileFlow {
         void sanity_check();
         void get_shape_constraints();
         void get_memory_constraints();
+        void get_resource_constraints();
         void add_access_pattern(
             problem::Shape::DataSpaceID producer_id,
             const Node *producer,

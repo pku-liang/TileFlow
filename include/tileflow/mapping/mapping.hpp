@@ -47,7 +47,9 @@ public:
         Scope
     };
 protected:
+    static const std::unordered_map<type_t, std::string> type2name_; 
     Node::type_t type_;
+    std::string name_;
     mutable const Node* parent_ = nullptr;
     std::vector<const Node*> children_;
     std::string storage_level_name_;
@@ -61,23 +63,17 @@ protected:
     void display_active_tensors(std::string prefix) const;
 
 public: 
-    Node(type_t t_): type_(t_) {}
+    Node(type_t t_): type_(t_), name_(type2name_.at(t_)) {}
     
     unsigned get_storage_level() const {return storage_level_;}
     std::string get_storage_name() const {return storage_level_name_;}
+    std::string get_name() const {return name_;}
     type_t get_type() const {return type_;}
 
     ActiveTensor& get_active_tensors() const {return active_tensors_;}
     
-    void add_child(const Node* child) {
-        if (type_ == Node::Scope) {
-            assert(storage_level_ == unsigned(-1) || storage_level_ == child->get_storage_level());
-            storage_level_ = child->get_storage_level();
-            storage_level_name_ = child->get_storage_name();
-        }
-        assert(child != nullptr); 
-        children_.push_back(child); 
-        child->set_parent(this);}
+    void add_child(const Node* child);
+    
     void replace_child(const Node* old_child, const Node* new_child){
         auto iter = find(children_.begin(), children_.end(), old_child);
         if (iter != children_.end()) {
@@ -153,13 +149,13 @@ public:
 };
 
 class OpNode: public Node {
-    std::string name_;
+    std::string op_name_;
     int op_index_;
     std::shared_ptr<problem::TileFlow::Workload> p_workload;
 public:
     OpNode(config::CompoundConfigNode config);
     void display(std::string prefix, bool recursive) const override;
-    const std::string & get_name() const {return name_;}
+    const std::string & get_name() const {return op_name_;}
     void accept(Visitor* visitor) const {visitor->visitOp(this);}
     const std::shared_ptr<problem::TileFlow::Workload>& get_workload() const {return p_workload;}
 };

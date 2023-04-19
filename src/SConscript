@@ -102,6 +102,7 @@ lib_sources = Split("""
 ./mapper/checker.cpp
 ./mapper/expr.cpp
 ./mapper/mapper.cpp
+./mapper/op.cpp
 ./common.cpp
 """)
 
