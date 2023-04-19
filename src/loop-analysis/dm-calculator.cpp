@@ -128,6 +128,12 @@ namespace analysis
             auto type = node->get_scope_type();
             auto ret_ = RetVal();
 
+            std::set<unsigned> active_tensors;
+            active_tensors.insert(node->get_active_tensors().fill_tensors.begin(), 
+                                node->get_active_tensors().fill_tensors.end());
+            active_tensors.insert(node->get_active_tensors().wb_tensors.begin(), 
+                                node->get_active_tensors().wb_tensors.end());
+
             for (auto& child: node->get_children()) {
                 input.curr_node_ = child;
                 input_stack_.push(input);
@@ -138,15 +144,14 @@ namespace analysis
                     input.init_working_set_ = ret.last_working_set_;
                 else 
                     ret_.last_working_set_.Add(ret.last_working_set_);
-                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces;
-                ++pv) {
+                for (auto pv: active_tensors) {
                     ret_.access_stat_[pv].Accumulate(ret.access_stat_[pv]);
                 }
                 if (type == ScopeNode::Sharing || type == ScopeNode::Sequential)
                     ret_.cycle_ += ret.cycle_;
                 else ret_.cycle_ = std::max(ret.cycle_, ret_.cycle_);
             }
-
+            
             if (type == ScopeNode::Pipeline || type == ScopeNode::Sequential)
                 ret_.last_working_set_ = input.init_working_set_;
             ret_stack_.push(ret_);

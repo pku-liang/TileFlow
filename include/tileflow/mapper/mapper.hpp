@@ -19,7 +19,8 @@ class Mapper {
     const mapping::TileFlow::Mapping& mapping_;
     const model::Engine::Specs& arch_specs_;
     const model::Topology& topology_;
-
+    bool enable_mem_check_ = true;
+    bool enable_spatial_check_ = true;
     SymbolTable optimum_;
 
 public:
@@ -27,10 +28,13 @@ public:
         const problem::TileFlow::Workloads& workloads_, 
         const mapping::TileFlow::Mapping& mapping_, 
         const model::Engine::Specs& arch_specs_, 
-        const model::Topology& topology_):
+        const model::Topology& topology_,
+        bool enable_mem_check_ = true, 
+        bool enable_spatial_check_ = true):
         constraints_(constraints_), workloads_(workloads_), 
         mapping_(mapping_), arch_specs_(arch_specs_), 
-        topology_(topology_){}
+        topology_(topology_), enable_mem_check_(enable_mem_check_), 
+        enable_spatial_check_(enable_spatial_check_){}
     
     SymbolTable search();
 

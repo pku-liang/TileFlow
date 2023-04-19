@@ -282,7 +282,7 @@ namespace analysis
         ) {
             return {std::max(o1.x, o2.x), std::max(o1.y, o2.y), std::max(o1.max_x, o2.max_x)};
         }
-
+        
         void SpatialOffsetsCalculator::visitScope(const ScopeNode* node) {
             auto type = node->get_scope_type();
             offset_t init_offset = {0,0,0};
@@ -290,29 +290,30 @@ namespace analysis
                 init_offset = input_offsets.top();
                 input_offsets.pop();
             }
-            offset_t output_offset = init_offset;
+            offset_t output_offset;
             if (type == ScopeNode::Sequential || type == ScopeNode::Sharing) {
-                input_offsets.push(init_offset);
-                for (auto child: node->get_children()) {
-                    child->accept(this);
-                    assert(!output_offsets.empty());
-                    init_offset = output_offsets.top();
-                    output_offsets.pop();
-                }
-                output_offset = init_offset;
-            }
-            else {
+                output_offset = {0,0,0};
                 for (auto child: node->get_children()) {
                     input_offsets.push(init_offset);
                     child->accept(this);
                     assert(!output_offsets.empty());
-                    init_offset = merge(output_offset, output_offsets.top());
+                    output_offset = merge(output_offset, output_offsets.top());
+                    output_offsets.pop();
+                }
+            }
+            else {
+                output_offset = init_offset;
+                for (auto child: node->get_children()) {
+                    input_offsets.push(output_offset);
+                    child->accept(this);
+                    assert(!output_offsets.empty());
+                    output_offset = output_offsets.top();
                     output_offsets.pop();
                 }
             }
             output_offsets.push(output_offset);
         } 
-
+        
         void SpatialOffsetsCalculator::visitTile(const TileNode* node) {
             offset_t init_offset = {0,0,0};
             if (!input_offsets.empty()) {
@@ -642,7 +643,7 @@ namespace analysis
                 ++pv) {
                 access_stat[pv].clear();        
             }
-            // the init
+            // the init {} --> (0,0,...,0)
             {
                 InputParam input = input_;
                 input.init_working_set_ = {};
@@ -664,7 +665,10 @@ namespace analysis
             for (auto lc: loop_counts) all_iter *= lc;
 
             int real_iter = 1;
-
+            /**
+             * delta = (00001)
+             *          (0009) -> (0010)
+            */
             for (int i = 0; i < (int)nest_state_.size(); ++i) {
                 if (loop_counts[i] <= 1) continue;
                 InputParam input = input_;

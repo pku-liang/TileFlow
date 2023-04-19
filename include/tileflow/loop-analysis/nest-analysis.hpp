@@ -393,8 +393,6 @@ namespace TileFlow {
         expansion_(1,1) {}
     };
 
-    
-
 } // namespace TileFlow 
 
 } // namespace analysis 

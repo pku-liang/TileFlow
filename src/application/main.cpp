@@ -105,7 +105,15 @@ int main(int argc, char* argv[])
 
   checker.display();
 
-  TileFlow::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology);
+  bool enable_mem_check_ = true;
+  bool enable_spatial_check_ = true;
+  if (root.exists("check")) {
+    auto checknode = root.lookup("check");
+    checknode.lookupValue("mem", enable_mem_check_);
+    checknode.lookupValue("spatial", enable_spatial_check_);
+  }
+
+  TileFlow::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, enable_mem_check_, enable_spatial_check_);
 
   mapper.search();
 

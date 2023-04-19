@@ -13,8 +13,14 @@ using mapping::TileFlow::Visitor;
 namespace TileFlow {
 
     struct Constraint {
+        enum {
+            LOOPCOUNT,
+            MEM, 
+            SPATIAL
+        }type_; 
         std::shared_ptr<Expr> expr;
         std::string msg;
+        std::string short_msg = "";
     };
 
     class ShapeConstraintParser: public Visitor {
@@ -46,7 +52,7 @@ namespace TileFlow {
             const problem::Workload& workload, 
             const model::Topology& topology): 
             workload_(workload), topology_(topology){}
-        std::vector<Constraint > parse(const Node*root);
+        std::vector<Constraint> parse(const Node*root);
     };
 
     class ResourceConstraintParser: public Visitor {

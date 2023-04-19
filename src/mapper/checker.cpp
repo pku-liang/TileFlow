@@ -46,8 +46,10 @@ void ShapeConstraintParser::visitOp(const OpNode* node) {
         }
         else {
             constraints.push_back({
+                Constraint::LOOPCOUNT,
                 product(expr.second) == parameter(scale / expr.first),
-                " loopcount constraint for tiling of dim " + kv.first
+                " loopcount constraint for tiling of dim " + kv.first,
+                kv.first 
             });
         }
     }
@@ -171,22 +173,24 @@ void Checker::add_access_pattern(
         sc.push(consumer);
         consumer = consumer->get_parent();
     }
-    std::stack<const Node *> common;
+
+    const Node * common = nullptr;
     while (!sc.empty() && !sp.empty() && sc.top() == sp.top())
     {
-        common.push(sc.top());
+        common = sc.top();
         sc.pop();
         sp.pop();
     }
+    sc.push(common); sp.push(common);
 
-    while (!common.empty()) {
-        auto node = common.top();
-        common.pop();
-        sc.push(node); sp.push(node);
-        if (node->get_type() == Node::type_t::Tile && 
-            static_cast<const TileNode *>(node)->get_tile_type() == TileNode::Temporal)
-            break;
-    }
+    // while (!common.empty()) {
+    //     auto node = common.top();
+    //     common.pop();
+    //     sc.push(node); sp.push(node);
+    //     if (node->get_type() == Node::type_t::Tile && 
+    //         static_cast<const TileNode *>(node)->get_tile_type() == TileNode::Temporal)
+    //         break;
+    // }
 
     if (producer_id != problem::Shape::DataSpaceID(-1)) {
         while (!sp.empty()) {
@@ -334,8 +338,10 @@ void MemoryConstraintParser::add_constraint(const Node* node) {
         footprints.push_back(cal_footprint(pv));
     
     constraints_.push_back({
+        Constraint::MEM,
         Op::sum(footprints) <= parameter(size.Get()),
-        "Memory constraint at " + node->get_name()
+        "Memory constraint at " + node->get_name(),
+        node->get_storage_name()
     });
 }
 
@@ -440,8 +446,10 @@ void ResourceConstraintParser::add_constraint(const Node* node) {
         auto fanout_x = mapping_.fanoutX_map.at(node->get_storage_level());
         auto fanout_y = mapping_.fanoutY_map.at(node->get_storage_level());
         constraints_.push_back(
-            {core_usage_ <= Op::pair(fanout_x, fanout_y),
-            "Resource constraint at " + node->get_name()});
+            {Constraint::SPATIAL,
+            core_usage_ <= Op::pair(fanout_x, fanout_y),
+            "Resource constraint at " + node->get_name(),
+            node->get_storage_name()});
     }
 }
 
