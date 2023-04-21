@@ -1,0 +1,2 @@
+input file: flat-mgran.yaml
+ERROR: key not found: problem, at line: 0

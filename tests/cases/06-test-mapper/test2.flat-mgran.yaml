@@ -1,0 +1,451 @@
+architecture:
+  version: 0.2
+  subtree:
+  - name: System
+    attributes:
+    local:
+    - name: L2
+      class: DRAM
+      attributes:
+        word-bits: 16
+        block-size: 32
+        technology: 16nm
+        read_bandwidth: 25
+        sizeKB: 1600000000
+    subtree:
+    - name: Buffer[0..3]
+      attributes:
+        meshX: 4
+      local:
+      - name: L1
+        class: SRAM
+        attributes:
+          width: 16
+          word-bits: 16
+          technology: 16nm
+          read_bandwidth: 500
+          sizeKB: 4000
+      subtree:
+      - name: PE
+        attributes:
+        local:
+        - name: L0[0..1023]
+          class: regfile
+          attributes:
+            depth: 1
+            meshX: 1024
+            word-bits: 16
+            block-size: 3
+            technology: 16nm
+            read_bandwidth: 3
+        - name: mac[0..1023]
+          class: intmac
+          attributes:
+            meshX: 1024
+
+problem:
+  io:
+    ins: Q K V
+    outs: J
+  dimensions: [B,H,M,N,A,L]
+  instance:
+    B: 1
+    H: 12
+    M: 512
+    N: 64
+    A: 64
+    L: 512
+
+  ops:
+  - name: ProduceC
+    dimensions: [B,H,A,L,M]
+    data-spaces:
+    - name: C
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: K
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[A]]
+        - [[L]]
+    - name: Q
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[A]]
+    ins: K, Q
+    out: C
+
+  - name: ProduceD
+    dimensions: [B,H,M,L]
+    data-spaces:
+    - name: D
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+      read-write: True
+    - name: C
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: C
+    out: D
+
+  - name: ProduceE
+    dimensions: [B,H,M,L]
+    data-spaces:
+    - name: E
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: D
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+    - name: C
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: D, C
+    out: E
+
+  - name: ProduceF
+    dimensions: [B,H,M,L]
+    data-spaces:
+    - name: F
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: E
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: E
+    out: F
+
+  - name: ProduceG
+    dimensions: [B,H,M,L]
+    data-spaces:
+    - name: G
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+      read-write: True
+    - name: F
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: F
+    out: G
+
+  - name: ProduceI
+    dimensions: [B,H,M,L]
+    data-spaces:
+    - name: I
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: G
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+    - name: F
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: G, F
+    out: I
+
+  - name: ProduceJ
+    dimensions: [B,H,L,N,M]
+    data-spaces:
+    - name: J
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[N]]
+      read-write: True
+    - name: V
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[L]]
+        - [[N]]
+    - name: I
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: V, I
+    out: J
+
+
+mapping:
+  node-type: Tile
+  type: Temporal
+  factors: B=X H=X M=X
+  permutation: BHM
+  target: L2
+
+  subtree:
+    - node-type: Scope
+      type: Sequential
+
+      subtree:
+        - node-type: Scope
+          type: Pipeline
+
+          subtree:
+            - node-type: Tile
+              type: Spatial
+              factors: B=X H=X M=X
+              permutation: BHM
+              target: L2
+
+              subtree:
+                - node-type: Tile
+                  type: Temporal
+                  factors: B=X H=X M=X L=X A=X
+                  permutation: BHMLA
+                  target: L1
+
+                  subtree:
+                    - node-type: Tile
+                      type: Spatial
+                      factors: L=X A=X
+                      permutation: LA
+                      target: L1
+
+                      subtree:
+                        - node-type: Tile
+                          type: Temporal
+                          factors: L=1 A=1
+                          permutation: LA
+                          target: L0
+
+                          subtree:
+                            - node-type: Op
+                              name: ProduceC
+                              binding: B:B H:H M:M L:L A:A
+            - node-type: Scope
+              type: Sequential
+
+              subtree:
+                - node-type: Tile
+                  type: Spatial
+                  factors: B=X H=X M=X
+                  permutation: BHM
+                  target: L2
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: B=X H=X M=X L=X
+                      permutation: BHML
+                      target: L1
+
+                      subtree:
+                        - node-type: Tile
+                          type: Spatial
+                          factors: L=X
+                          permutation: L
+                          target: L1
+
+                          subtree:
+                            - node-type: Tile
+                              type: Temporal
+                              factors: L=1
+                              permutation: L
+                              target: L0
+
+                              subtree:
+                                - node-type: Op
+                                  name: ProduceD
+                                  binding: B:B H:H M:M L:L
+                - node-type: Tile
+                  type: Spatial
+                  factors: B=X H=X M=X
+                  permutation: BHM
+                  target: L2
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: B=X H=X M=X L=X
+                      permutation: BHML
+                      target: L1
+
+                      subtree:
+                        - node-type: Tile
+                          type: Spatial
+                          factors: L=X
+                          permutation: L
+                          target: L1
+
+                          subtree:
+                            - node-type: Tile
+                              type: Temporal
+                              factors: L=1
+                              permutation: L
+                              target: L0
+
+                              subtree:
+                                - node-type: Op
+                                  name: ProduceE
+                                  binding: B:B H:H M:M L:L
+                - node-type: Tile
+                  type: Spatial
+                  factors: B=X H=X M=X
+                  permutation: BHM
+                  target: L2
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: B=X H=X M=X L=X
+                      permutation: BHML
+                      target: L1
+
+                      subtree:
+                        - node-type: Tile
+                          type: Spatial
+                          factors: L=X
+                          permutation: L
+                          target: L1
+
+                          subtree:
+                            - node-type: Tile
+                              type: Temporal
+                              factors: L=1
+                              permutation: L
+                              target: L0
+
+                              subtree:
+                                - node-type: Op
+                                  name: ProduceF
+                                  binding: B:B H:H M:M L:L
+                - node-type: Tile
+                  type: Spatial
+                  factors: B=X H=X M=X
+                  permutation: BHM
+                  target: L2
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: B=X H=X M=X L=X
+                      permutation: BHML
+                      target: L1
+
+                      subtree:
+                        - node-type: Tile
+                          type: Spatial
+                          factors: L=X
+                          permutation: L
+                          target: L1
+
+                          subtree:
+                            - node-type: Tile
+                              type: Temporal
+                              factors: L=1
+                              permutation: L
+                              target: L0
+
+                              subtree:
+                                - node-type: Op
+                                  name: ProduceG
+                                  binding: B:B H:H M:M L:L
+                - node-type: Tile
+                  type: Spatial
+                  factors: B=X H=X M=X
+                  permutation: BHM
+                  target: L2
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: B=X H=X M=X L=X
+                      permutation: BHML
+                      target: L1
+
+                      subtree:
+                        - node-type: Tile
+                          type: Spatial
+                          factors: L=X
+                          permutation: L
+                          target: L1
+
+                          subtree:
+                            - node-type: Tile
+                              type: Temporal
+                              factors: L=1
+                              permutation: L
+                              target: L0
+
+                              subtree:
+                                - node-type: Op
+                                  name: ProduceI
+                                  binding: B:B H:H M:M L:L
+        - node-type: Tile
+          type: Spatial
+          factors: B=X H=X M=X
+          permutation: BHM
+          target: L2
+
+          subtree:
+            - node-type: Tile
+              type: Temporal
+              factors: B=X H=X M=X N=X L=X
+              permutation: BHMNL
+              target: L1
+
+              subtree:
+                - node-type: Tile
+                  type: Spatial
+                  factors: N=X L=X
+                  permutation: NL
+                  target: L1
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: N=1 L=1
+                      permutation: NL
+                      target: L0
+
+                      subtree:
+                        - node-type: Op
+                          name: ProduceJ
+                          binding: B:B H:H M:M N:N L:L
+

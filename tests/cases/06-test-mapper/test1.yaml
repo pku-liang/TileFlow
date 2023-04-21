@@ -1,0 +1,84 @@
+problem:
+  io:
+    ins: A, B
+    outs: C
+  dimensions: [M,N,K]
+  instance:
+    M: 32
+    N: 16
+    K: 16
+
+  ops:
+  - name: GEMM
+    dimensions: [M,N,K] 
+    data-spaces:
+    - name: C 
+      projection:
+        - [[M]] 
+        - [[N]] 
+      read-write: True 
+    - name: A 
+      projection:
+        - [[M]]
+        - [[K]]
+    - name: B
+      projection:
+        - [[K]]
+        - [[N]]
+    ins: A, B
+    out: C
+
+mapping:
+  node-type: Tile 
+  type: temporal 
+  factors: M=X N=X K=X
+  permutation: MNK 
+  target: MainMemory 
+      
+
+  subtree: 
+  - node-type: Tile 
+    type: temporal  
+    factors: M=X N=X K=X
+    permutation: MKN 
+    target: RegFile
+    
+    subtree:
+    - node-type: Op
+      name: GEMM 
+      binding: M:M N:N K:K 
+
+tileflow-mapper:
+  objective: energy
+
+architecture: 
+  version: 0.2 
+
+  subtree:
+  - name: System
+    
+    local: 
+    - name: MainMemory
+      class: DRAM 
+      attributes:
+        depth: 1
+        block-size: 2048
+        word-bits: 8
+      
+    subtree:
+    - name: PE
+
+      local: 
+      - name: RegFile
+        class: regfile 
+        attributes:
+          depth: 112 
+          width: 16 
+          word-bits: 8
+          read_bandwidth: 1
+          write_bandwidth: 1
+
+      - name: mac 
+        class: intmac 
+        attributes: 
+          datawidth: 16 
