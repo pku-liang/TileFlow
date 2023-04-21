@@ -224,13 +224,13 @@ num_t gcd(num_t a, num_t b)
 bool SymbolTable::fail_check(const std::vector<Constraint>& constraints_) {
     for (auto& cons: constraints_) {
         if (cons.type_ == Constraint::MEM || cons.type_ == Constraint::SPATIAL) {
-            if (!cons.expr->eval(global_symbol_table_)) return true;
+            if (!cons.expr->eval(*this)) return true;
         }
         else if (cons.type_ == Constraint::LOOPCOUNT) {
             auto cond = std::static_pointer_cast<CondExpr>(cons.expr);
             auto vars = VariableCollector()(cons.expr.get(), [this](int idx){return !lookup(idx).fixed_;});
-            auto r = cond->right_->eval(global_symbol_table_);
-            auto l = cond->left_->eval(global_symbol_table_);
+            auto r = cond->right_->eval(*this);
+            auto l = cond->left_->eval(*this);
             if ((vars.empty() && l != r) || (!vars.empty() && r % l != 0)) {
                 return true;
             }
@@ -241,6 +241,7 @@ bool SymbolTable::fail_check(const std::vector<Constraint>& constraints_) {
 
 void SymbolTable::fix_and_update(int index, num_t value,
         const std::vector<Constraint>& constraints_) {
+    assert(value!=0);
     assert(idx2values_.count(index));
     auto& entry = idx2values_[index];
     assert(entry.candidates_.count(value));
@@ -332,8 +333,8 @@ void SymbolTable::init(const std::vector<Constraint>& constraints_) {
 
     for(auto& kv: fixed){
         auto& entry = idx2values_[kv.first];
-        if ((entry.fixed_ == false && entry.candidates_.count(kv.second)) 
-        || (entry.fixed_ && entry.value_ == kv.second)) {
+        if ((!entry.fixed_ && entry.candidates_.count(kv.second)) 
+        || (entry.fixed_ && (entry.value_ == kv.second))) {
             entry.fixed_ = true; 
             entry.value_ = kv.second;
             entry.candidates_ = {kv.second};
@@ -348,14 +349,13 @@ void SymbolTable::init(const std::vector<Constraint>& constraints_) {
 }
 
 int SymbolTable::get_next_var() const {
-    if (failed_) return 1;
+    if (failed_) return ERROR_OUT;
     size_t min_candidate = 1e3;
-    int var = 1;
+    int var = NORMAL_OUT;
     for (auto& kv: idx2values_) {
         if (!kv.second.fixed_ && (min_candidate > kv.second.candidates_.size())) {
             min_candidate = kv.second.candidates_.size();
             var = kv.first;
-            assert(var < 0);
         }
     }
     return var;
@@ -413,7 +413,7 @@ std::ostream& operator<< (std::ostream& o, const SymbolTable& table) {
 void SymbolTable::show_brief(std::ostream& o) const {
     for (int i = -1; i >= idx; i--) {
         auto& entry = idx2values_.at(i);
-        o << "<" << entry.name_ << "," << entry.value_ << ">,";
+        o << "<" << entry.name_ << "," << entry.fixed_ << "," << entry.value_ << ">,";
     }
 }
 

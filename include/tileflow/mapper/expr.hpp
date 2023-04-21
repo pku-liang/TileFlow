@@ -8,6 +8,9 @@
 #include <functional>
 
 namespace TileFlow {
+    const int ERROR_OUT=1;
+    const int NORMAL_OUT=2;
+
     typedef size_t num_t;
 
     struct Constraint;

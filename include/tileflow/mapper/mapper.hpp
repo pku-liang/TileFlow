@@ -52,9 +52,9 @@ struct State {
 
     State* take_action(const Action& action, const std::vector<Constraint>& constraints_);
 
-    inline bool is_terminated() const {return candidate_factors_.size() == 0;}
+    inline bool is_terminated() const {return variable_index > 0 || candidate_factors_.size() == 0;}
     inline bool is_error_out() const {
-        return variable_index <= 0 && is_terminated();
+        return variable_index == ERROR_OUT;
     }
 };
 

@@ -10,7 +10,7 @@ namespace mapper {
 
 const SymbolTable& Mapper::search() {
     std::string obj = obj_ == Objective::CYCLE? "cycle" : "energy";
-    TILEFLOW_LOG("Optimize " << obj);
+    TILEFLOW_LOG("Optimize " << obj << "...");
     analysis::TileFlow::NestAnalysis analyzer(workloads_, mapping_, arch_specs_, topology_);
     Env env(constraints_, global_symbol_table_, analyzer, obj_);
     MCTS mcts(&env);
@@ -80,6 +80,13 @@ Action Env::step(bool random) {
         else 
         {
             analyzer_.set_symbol_table(&curr_state_->symbol_table_);
+            if (verbose_level > 1) {
+                std::cout << "begin analyze..." << std::endl;
+                std::cout << "symbol table: ";
+                curr_state_->symbol_table_.show_brief(std::cout);
+                std::cout << std::endl;
+                analyzer_.Print();
+            }
             analyzer_.analyze();
             double value; 
             if (obj_ == Objective::CYCLE) value = (double)(analyzer_.get_cycle());
