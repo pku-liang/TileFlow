@@ -1,0 +1,241 @@
+input file: flat-mgran.yaml
+Warning: neither block size nor cluster size specified, set according to specified storage width: block size: 1  cluster-size: 1
+Begin ParseWorkload...
+[WARNING] There are 2 alive workloads.
+[WARNING] There are 3 alive workloads.
+[WARNING] There are 4 alive workloads.
+[WARNING] There are 5 alive workloads.
+[WARNING] There are 6 alive workloads.
+[WARNING] There are 7 alive workloads.
+[WARNING] There are 8 alive workloads.
+Begin Spec...
+==============Checker BEG================
+-----------------Mapping---------------
+root: 0xc3a990
+read: K Q V J update: J 
+for M in [0:X1), L2
+  for H in [0:X0), L2
+    for B in [0:X), L2
+      read: K Q V I I J update: I J fill: K Q V J write-back: J 
+      Scope: Sequential{
+        read: K Q C C C C I update: C C I fill: K Q I write-back: I 
+        Scope: Pipeline{
+          read: K Q C C update: C C fill: K Q C C write-back: C C 
+          for M in [0:X4) (Spatial-X), L2
+            for H in [0:X3) (Spatial-X), L2
+              for B in [0:X2) (Spatial-X), L2
+                read: K Q C C update: C C fill: K Q C C write-back: C C 
+                for A in [0:X9), L1
+                  for L in [0:X8), L1
+                    for M in [0:X7), L1
+                      for H in [0:X6), L1
+                        for B in [0:X5), L1
+                          read: K Q C C update: C C fill: K Q C C write-back: C C 
+                          for A in [0:X11) (Spatial-X), L1
+                            for L in [0:X10) (Spatial-X), L1
+                              read: K Q C C update: C C fill: K Q C C write-back: C C 
+                              for A in [0:1), L0
+                                for L in [0:1), L0
+                                  read: K Q C C update: C C fill: K Q C C write-back: C C 
+                                  Op: ProduceC(K,Q,)->C
+
+          read: C D D C E E F F G G F F I update: D E F G F I fill: C C I write-back: I 
+          Scope: Sequential{
+            read: C D update: D fill: C D write-back: D 
+            for M in [0:X14) (Spatial-X), L2
+              for H in [0:X13) (Spatial-X), L2
+                for B in [0:X12) (Spatial-X), L2
+                  read: C D update: D fill: C D write-back: D 
+                  for L in [0:X18), L1
+                    for M in [0:X17), L1
+                      for H in [0:X16), L1
+                        for B in [0:X15), L1
+                          read: C D update: D fill: C D write-back: D 
+                          for L in [0:X19) (Spatial-X), L1
+                            read: C D update: D fill: C D write-back: D 
+                            for L in [0:1), L0
+                              read: C D update: D fill: C D write-back: D 
+                              Op: ProduceD(C,)->D
+
+            read: D C E update: E fill: D C E write-back: E 
+            for M in [0:X22) (Spatial-X), L2
+              for H in [0:X21) (Spatial-X), L2
+                for B in [0:X20) (Spatial-X), L2
+                  read: D C E update: E fill: D C E write-back: E 
+                  for L in [0:X26), L1
+                    for M in [0:X25), L1
+                      for H in [0:X24), L1
+                        for B in [0:X23), L1
+                          read: D C E update: E fill: D C E write-back: E 
+                          for L in [0:X27) (Spatial-X), L1
+                            read: D C E update: E fill: D C E write-back: E 
+                            for L in [0:1), L0
+                              read: D C E update: E fill: D C E write-back: E 
+                              Op: ProduceE(D,C,)->E
+
+            read: E F F update: F F fill: E F F write-back: F F 
+            for M in [0:X30) (Spatial-X), L2
+              for H in [0:X29) (Spatial-X), L2
+                for B in [0:X28) (Spatial-X), L2
+                  read: E F F update: F F fill: E F F write-back: F F 
+                  for L in [0:X34), L1
+                    for M in [0:X33), L1
+                      for H in [0:X32), L1
+                        for B in [0:X31), L1
+                          read: E F F update: F F fill: E F F write-back: F F 
+                          for L in [0:X35) (Spatial-X), L1
+                            read: E F F update: F F fill: E F F write-back: F F 
+                            for L in [0:1), L0
+                              read: E F F update: F F fill: E F F write-back: F F 
+                              Op: ProduceF(E,)->F
+
+            read: F G update: G fill: F G write-back: G 
+            for M in [0:X38) (Spatial-X), L2
+              for H in [0:X37) (Spatial-X), L2
+                for B in [0:X36) (Spatial-X), L2
+                  read: F G update: G fill: F G write-back: G 
+                  for L in [0:X42), L1
+                    for M in [0:X41), L1
+                      for H in [0:X40), L1
+                        for B in [0:X39), L1
+                          read: F G update: G fill: F G write-back: G 
+                          for L in [0:X43) (Spatial-X), L1
+                            read: F G update: G fill: F G write-back: G 
+                            for L in [0:1), L0
+                              read: F G update: G fill: F G write-back: G 
+                              Op: ProduceG(F,)->G
+
+            read: G F I update: I fill: G F I write-back: I 
+            for M in [0:X46) (Spatial-X), L2
+              for H in [0:X45) (Spatial-X), L2
+                for B in [0:X44) (Spatial-X), L2
+                  read: G F I update: I fill: G F I write-back: I 
+                  for L in [0:X50), L1
+                    for M in [0:X49), L1
+                      for H in [0:X48), L1
+                        for B in [0:X47), L1
+                          read: G F I update: I fill: G F I write-back: I 
+                          for L in [0:X51) (Spatial-X), L1
+                            read: G F I update: I fill: G F I write-back: I 
+                            for L in [0:1), L0
+                              read: G F I update: I fill: G F I write-back: I 
+                              Op: ProduceI(G,F,)->I
+
+          }
+        }
+        read: V I J update: J fill: V I J write-back: J 
+        for M in [0:X54) (Spatial-X), L2
+          for H in [0:X53) (Spatial-X), L2
+            for B in [0:X52) (Spatial-X), L2
+              read: V I J update: J fill: V I J write-back: J 
+              for L in [0:X59), L1
+                for N in [0:X58), L1
+                  for M in [0:X57), L1
+                    for H in [0:X56), L1
+                      for B in [0:X55), L1
+                        read: V I J update: J fill: V I J write-back: J 
+                        for L in [0:X61) (Spatial-X), L1
+                          for N in [0:X60) (Spatial-X), L1
+                            read: V I J update: J fill: V I J write-back: J 
+                            for L in [0:1), L0
+                              for N in [0:1), L0
+                                read: V I J update: J fill: V I J write-back: J 
+                                Op: ProduceJ(V,I,)->J
+
+      }
+---------------------------------------
+constraints:
+	X9*X11==64
+	X*X2*X5==1
+	X0*X3*X6==12
+	X8*X10==512
+	X1*X4*X7==512
+	X*X12*X15==1
+	X0*X13*X16==12
+	X18*X19==512
+	X1*X14*X17==512
+	X*X20*X23==1
+	X0*X21*X24==12
+	X26*X27==512
+	X1*X22*X25==512
+	X*X28*X31==1
+	X0*X29*X32==12
+	X34*X35==512
+	X1*X30*X33==512
+	X*X36*X39==1
+	X0*X37*X40==12
+	X42*X43==512
+	X1*X38*X41==512
+	X*X44*X47==1
+	X0*X45*X48==12
+	X50*X51==512
+	X1*X46*X49==512
+	X*X52*X55==1
+	X0*X53*X56==12
+	X59*X61==512
+	X1*X54*X57==512
+	X58*X60==64
+	(X5*X6*X7*X10*X8+X5*X6*X11*X9*X10*X8+X5*X6*X7*X11*X9)<=2048000
+	(X15*X16*X17*X19*X18+X15*X16*X17)<=2048000
+	(X23*X24*X25*X27*X26+X23*X24*X25+X23*X24*X25*X27*X26)<=2048000
+	(X31*X32*X33*X35*X34+X31*X32*X33*X35*X34)<=2048000
+	(X39*X40*X41*X43*X42+X39*X40*X41)<=2048000
+	(X47*X48*X49*X51*X50+X47*X48*X49+X47*X48*X49*X51*X50)<=2048000
+	(X55*X56*X57*X61*X59+X55*X56*X57*X61*X59+X55*X56*X57*X61*X59)<=2048000
+	(X55*X52*X*X56*X53*X0*1*X61*X59+X55*X52*X*X56*X53*X0*X57*X54*X1*1+X55*X52*X*X56*X53*X0*X57*X54*X1*X61*X59+X55*X52*X*X56*X53*X0*X57*X54*X1*X61*X59)<=819200000000
+	<X11*X10, 1><=<256, 4>
+	<X19, 1><=<256, 4>
+	<X27, 1><=<256, 4>
+	<X35, 1><=<256, 4>
+	<X43, 1><=<256, 4>
+	<X51, 1><=<256, 4>
+	<X61*X60, 1><=<256, 4>
+	Max((<X4*X3*X2, 1>+Max(<X14*X13*X12, 1>,<X22*X21*X20, 1>,<X30*X29*X28, 1>,<X38*X37*X36, 1>,<X46*X45*X44, 1>)),<X54*X53*X52, 1>)<=<4, 1>
+==============Checker END================
+begin mapping...
+[LOG]: Optimize cycle
+[LOG]: Expand state has 3 child.
+[LOG]: Update best <X,1>,<X0,6>,<X1,0>,<X2,1>,<X3,0>,<X4,0>,<X5,1>,<X6,0>,<X7,0>,<X8,0>,<X9,0>,<X10,0>,<X11,0>,<X12,1>,<X13,0>,<X14,0>,<X15,1>,<X16,0>,<X17,0>,<X18,0>,<X19,0>,<X20,1>,<X21,2>,<X22,0>,<X23,1>,<X24,1>,<X25,0>,<X26,0>,<X27,0>,<X28,1>,<X29,0>,<X30,0>,<X31,1>,<X32,0>,<X33,0>,<X34,0>,<X35,0>,<X36,1>,<X37,0>,<X38,0>,<X39,1>,<X40,0>,<X41,0>,<X42,0>,<X43,0>,<X44,1>,<X45,0>,<X46,0>,<X47,1>,<X48,0>,<X49,0>,<X50,0>,<X51,0>,<X52,1>,<X53,0>,<X54,0>,<X55,1>,<X56,0>,<X57,0>,<X58,0>,<X59,0>,<X60,0>,<X61,0>, value: 36
+[LOG]: Update best <X,1>,<X0,4>,<X1,0>,<X2,1>,<X3,0>,<X4,0>,<X5,1>,<X6,0>,<X7,0>,<X8,0>,<X9,0>,<X10,0>,<X11,0>,<X12,1>,<X13,0>,<X14,0>,<X15,1>,<X16,0>,<X17,0>,<X18,0>,<X19,0>,<X20,1>,<X21,3>,<X22,0>,<X23,1>,<X24,1>,<X25,0>,<X26,0>,<X27,0>,<X28,1>,<X29,0>,<X30,0>,<X31,1>,<X32,0>,<X33,0>,<X34,0>,<X35,0>,<X36,1>,<X37,0>,<X38,0>,<X39,1>,<X40,0>,<X41,0>,<X42,0>,<X43,0>,<X44,1>,<X45,0>,<X46,0>,<X47,1>,<X48,0>,<X49,0>,<X50,0>,<X51,0>,<X52,1>,<X53,0>,<X54,0>,<X55,1>,<X56,0>,<X57,0>,<X58,0>,<X59,0>,<X60,0>,<X61,0>, value: 24
+[LOG]: Expand state has 3 child.
+[LOG]: Update best <X,1>,<X0,3>,<X1,0>,<X2,1>,<X3,0>,<X4,0>,<X5,1>,<X6,0>,<X7,0>,<X8,0>,<X9,0>,<X10,0>,<X11,0>,<X12,1>,<X13,0>,<X14,0>,<X15,1>,<X16,0>,<X17,0>,<X18,0>,<X19,0>,<X20,1>,<X21,2>,<X22,0>,<X23,1>,<X24,2>,<X25,0>,<X26,0>,<X27,0>,<X28,1>,<X29,0>,<X30,0>,<X31,1>,<X32,0>,<X33,0>,<X34,0>,<X35,0>,<X36,1>,<X37,0>,<X38,0>,<X39,1>,<X40,0>,<X41,0>,<X42,0>,<X43,0>,<X44,1>,<X45,0>,<X46,0>,<X47,1>,<X48,0>,<X49,0>,<X50,0>,<X51,0>,<X52,1>,<X53,0>,<X54,0>,<X55,1>,<X56,0>,<X57,0>,<X58,0>,<X59,0>,<X60,0>,<X61,0>, value: 21
+[LOG]: Update best <X,1>,<X0,2>,<X1,0>,<X2,1>,<X3,0>,<X4,0>,<X5,1>,<X6,0>,<X7,0>,<X8,0>,<X9,0>,<X10,0>,<X11,0>,<X12,1>,<X13,0>,<X14,0>,<X15,1>,<X16,0>,<X17,0>,<X18,0>,<X19,0>,<X20,1>,<X21,3>,<X22,0>,<X23,1>,<X24,2>,<X25,0>,<X26,0>,<X27,0>,<X28,1>,<X29,0>,<X30,0>,<X31,1>,<X32,0>,<X33,0>,<X34,0>,<X35,0>,<X36,1>,<X37,0>,<X38,0>,<X39,1>,<X40,0>,<X41,0>,<X42,0>,<X43,0>,<X44,1>,<X45,0>,<X46,0>,<X47,1>,<X48,0>,<X49,0>,<X50,0>,<X51,0>,<X52,1>,<X53,0>,<X54,0>,<X55,1>,<X56,0>,<X57,0>,<X58,0>,<X59,0>,<X60,0>,<X61,0>, value: 14
+[LOG]: Expand state has 2 child.
+[LOG]: Expand state has 2 child.
+[LOG]: Update best <X,1>,<X0,1>,<X1,0>,<X2,1>,<X3,0>,<X4,0>,<X5,1>,<X6,0>,<X7,0>,<X8,0>,<X9,0>,<X10,0>,<X11,0>,<X12,1>,<X13,0>,<X14,0>,<X15,1>,<X16,0>,<X17,0>,<X18,0>,<X19,0>,<X20,1>,<X21,3>,<X22,0>,<X23,1>,<X24,4>,<X25,0>,<X26,0>,<X27,0>,<X28,1>,<X29,0>,<X30,0>,<X31,1>,<X32,0>,<X33,0>,<X34,0>,<X35,0>,<X36,1>,<X37,0>,<X38,0>,<X39,1>,<X40,0>,<X41,0>,<X42,0>,<X43,0>,<X44,1>,<X45,0>,<X46,0>,<X47,1>,<X48,0>,<X49,0>,<X50,0>,<X51,0>,<X52,1>,<X53,0>,<X54,0>,<X55,1>,<X56,0>,<X57,0>,<X58,0>,<X59,0>,<X60,0>,<X61,0>, value: 9
+[LOG]: Expand state has 2 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: Expand state has 0 child.
+[LOG]: best factors: <X,1>,<X0,1>,<X1,0>,<X2,1>,<X3,0>,<X4,0>,<X5,1>,<X6,0>,<X7,0>,<X8,0>,<X9,0>,<X10,0>,<X11,0>,<X12,1>,<X13,0>,<X14,0>,<X15,1>,<X16,0>,<X17,0>,<X18,0>,<X19,0>,<X20,1>,<X21,3>,<X22,0>,<X23,1>,<X24,4>,<X25,0>,<X26,0>,<X27,0>,<X28,1>,<X29,0>,<X30,0>,<X31,1>,<X32,0>,<X33,0>,<X34,0>,<X35,0>,<X36,1>,<X37,0>,<X38,0>,<X39,1>,<X40,0>,<X41,0>,<X42,0>,<X43,0>,<X44,1>,<X45,0>,<X46,0>,<X47,1>,<X48,0>,<X49,0>,<X50,0>,<X51,0>,<X52,1>,<X53,0>,<X54,0>,<X55,1>,<X56,0>,<X57,0>,<X58,0>,<X59,0>,<X60,0>,<X61,0>,
+***TileFlow Result
+,value
+Cycle,9
+Energy,51135.8
+MEM::L1,1.46484e-06
+MEM::L1,9.76563e-07
+MEM::L1,5.85938e-06
+MEM::L1,9.76563e-07
+MEM::L1,9.76563e-07
+MEM::L1,1.46484e-06
+MEM::L1,1.46484e-06
+MEM::L2,4.88281e-12
+SPATIAL::L1,0.000976562
+SPATIAL::L1,0.000976562
+SPATIAL::L1,0.000976562
+SPATIAL::L1,0.000976562
+SPATIAL::L1,0.000976562
+SPATIAL::L1,0.000976562
+SPATIAL::L1,0.000976562
+SPATIAL::L2,1
+***TileFlow Result Ends

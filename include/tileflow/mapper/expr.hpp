@@ -4,23 +4,47 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <set>
+#include <functional>
 
 namespace TileFlow {
     typedef size_t num_t;
+
+    struct Constraint;
 
     struct Entry {
         std::string name_;
         num_t value_;
         int idx_;
+        std::set<num_t> candidates_;
+        bool fixed_ = false; 
     };
+
+    std::ostream& operator<< (std::ostream& o, const Entry&);
 
     class  SymbolTable {
         std::unordered_map<std::string, int> name2idx_;  
         std::unordered_map<int, Entry> idx2values_;
-        int idx = 0;
+        bool failed_ = false; 
+        bool fail_check(const std::vector<Constraint>& constraints_);
+
     public:
-        Entry lookup(const std::string& key) const {return idx2values_.at(name2idx_.at(key));}
-        Entry lookup(int key) const {return idx2values_.at(key);}
+        int idx = 0;
+        const Entry& lookup(const std::string& key) const {return idx2values_.at(name2idx_.at(key));}
+        const Entry& lookup(int key) const {return idx2values_.at(key);}
+        int count(int key) const {return idx2values_.count(key);}
+        bool is_terminated() const {
+            for(auto& kv: idx2values_) 
+                if(!kv.second.fixed_) return false;
+            return true;
+        }
+        int get_num_variables() const {return -idx;}
+        int count_unfixed() const {int ret = idx2values_.size(); for (auto& kv: idx2values_) ret -= kv.second.fixed_; return ret;}
+        int get_next_var() const;
+        void show_brief(std::ostream& o) const;
+        
+        
+        Entry& operator[](int key) {return idx2values_[key];}
         int insert(const std::string name = "") {
             std::string name_ = name;
             for (int i = 0; name2idx_.count(name_); i++){
@@ -28,18 +52,44 @@ namespace TileFlow {
             }
             idx--;
             name2idx_[name_] = idx;
-            idx2values_[idx] = {name_, 0, idx};
+            idx2values_[idx] = {name_, 0, idx, {}, false};
             return idx;
         }
-        int get_num_variables() const {return -idx;}
-        
+
+        void init(const std::vector<Constraint>& constraints_);
+        void fix_and_update(int index, num_t value, const std::vector<Constraint>& constraints_);
     };
 
+    std::ostream& operator<< (std::ostream& o, const SymbolTable&);
+
     extern SymbolTable global_symbol_table_;
+    
+    struct PairExpr;
+    struct PairSumExpr;
+    struct PairMaxExpr;
+    struct PairCondExpr;
+    struct ProductExpr;
+    struct VariableExpr;
+    struct ParameterExpr;
+    struct CondExpr;
+    struct SumExpr;
+
+    struct ExprVisitor {
+        virtual void visitPairExpr(const PairExpr*);
+        virtual void visitPairSumExpr(const PairSumExpr*);
+        virtual void visitPairMaxExpr(const PairMaxExpr*);
+        virtual void visitPairCondExpr(const PairCondExpr*);
+        virtual void visitProductExpr(const ProductExpr*);
+        virtual void visitSumExpr(const SumExpr*);
+        virtual void visitVariableExpr(const VariableExpr*);
+        virtual void visitParameterExpr(const ParameterExpr*);
+        virtual void visitCondExpr(const CondExpr*);
+    };
 
     struct Expr {
         virtual num_t eval(const SymbolTable&) = 0;
         virtual void display(const SymbolTable&) = 0;
+        virtual void accept(ExprVisitor*) const = 0;
     };
 
     struct ResourceExpr: public Expr {
@@ -47,6 +97,7 @@ namespace TileFlow {
         virtual void display(const SymbolTable& ) override {}
         // given y's limit, compute minimum required x
         virtual std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) = 0;
+        virtual void accept(ExprVisitor* visitor) const = 0;
     };
 
     struct PairExpr: public ResourceExpr {
@@ -56,6 +107,7 @@ namespace TileFlow {
             const std::shared_ptr<Expr>& y): x_(x), y_(y) {}
         void display(const SymbolTable& symb_table) override;
         std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitPairExpr(this);}
     };
 
     struct PairSumExpr: public ResourceExpr {
@@ -64,6 +116,7 @@ namespace TileFlow {
             operands_(operands){}
         void display(const SymbolTable& symb_table) override;
         std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitPairSumExpr(this);}
     };
 
     struct PairMaxExpr: public ResourceExpr {
@@ -72,6 +125,7 @@ namespace TileFlow {
             operands_(operands){}
         void display(const SymbolTable& symb_table) override;
         std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitPairMaxExpr(this);}
     };
 
     struct PairCondExpr: public ResourceExpr {
@@ -87,6 +141,7 @@ namespace TileFlow {
         void display(const SymbolTable& symb_table) override;
         num_t eval(const SymbolTable& symb_table) override;
         std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitPairCondExpr(this);}
     };
 
     struct SumExpr: public Expr {
@@ -95,17 +150,8 @@ namespace TileFlow {
             operands_(operands){}
         num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitSumExpr(this);}
     };
-
-    template <typename T> 
-    struct MaxExpr: public Expr {
-        std::vector<std::shared_ptr<T> > operands_;
-        MaxExpr(const std::vector<std::shared_ptr<T> >& operands):
-            operands_(operands){}
-        num_t eval(const SymbolTable& symb_table) override;
-        void display(const SymbolTable& symb_table) override;
-    };
-
 
     struct ProductExpr: public Expr {
         std::vector<std::shared_ptr<Expr> > operands_;
@@ -117,12 +163,14 @@ namespace TileFlow {
         ProductExpr(const std::pair<num_t, std::vector<int> >& operands);
         num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitProductExpr(this);}
     };
     struct VariableExpr: public Expr {
         int idx_;
         VariableExpr(int idx): idx_(idx){}
         num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitVariableExpr(this);}
     };
 
     struct ParameterExpr: public Expr {
@@ -130,6 +178,7 @@ namespace TileFlow {
         ParameterExpr(num_t value): value_(value){}
         num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitParameterExpr(this);}
     };
     
     struct CondExpr: public Expr {
@@ -146,6 +195,39 @@ namespace TileFlow {
         op_(op), left_(left), right_(right){}
         num_t eval(const SymbolTable& symb_table) override;
         void display(const SymbolTable& symb_table) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitCondExpr(this);}
+    };
+
+    struct VariableCollector: public ExprVisitor {
+        std::set<int> variables_;
+        std::function<bool(int)> _func;
+
+        void visitVariableExpr(const VariableExpr* expr) override {
+            if (_func(expr->idx_))
+                variables_.insert(expr->idx_);
+        }
+
+        std::set<int> operator()(const Expr* root, std::function<bool(int)>func) {
+            _func = func;
+            root->accept(this);
+            return std::move(variables_);
+        }
+        std::set<int> operator()(const Expr* root) {
+            _func = [](int){return true;};
+            root->accept(this);
+            return std::move(variables_);
+        }
+    };
+
+    struct Constraint {
+        enum {
+            LOOPCOUNT,
+            MEM, 
+            SPATIAL
+        }type_; 
+        std::shared_ptr<Expr> expr;
+        std::string msg;
+        std::string short_msg = "";
     };
 
 } // namespace TileFlow

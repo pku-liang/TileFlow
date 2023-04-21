@@ -112,18 +112,20 @@ namespace TileFlow {
         NestAnalysis(const problem::TileFlow::Workloads& workloads_, 
             const mapping::TileFlow::Mapping& mapping_, 
             const model::Engine::Specs& arch_specs_, 
-            const model::Topology& topology_, 
-            const SymbolTable* symb_table_ = nullptr);
+            const model::Topology& topology_);
+        
+        void set_symbol_table(const SymbolTable* symbol_table) {symb_table_ = symbol_table;}
         
         const tiling::CompoundTile& get_tile(const Node* node) const 
-            {
-                if (tiles_.count(node) == 0)    {
-                    std::cerr << "ERROR node not found:" << std::endl;
-                    node->display("", false);
-                }
-                return tiles_.at(node);
+        {
+            if (tiles_.count(node) == 0)    {
+                std::cerr << "ERROR node not found:" << std::endl;
+                node->display("", false);
             }
-
+            return tiles_.at(node);
+        }
+        
+        void reset();
         void analyze();
         void Print();
         void Report();
@@ -307,12 +309,14 @@ namespace TileFlow {
 
     class Displayer: public mapping::TileFlow::Visitor {
         NestAnalysis & analysis_;
+        const SymbolTable* symbol_table_;
         void visitTile(const TileNode*) override;
         void visitScope(const ScopeNode*) override;
         void visitOp(const OpNode*) override;
         std::string prefix_;
     public: 
-        Displayer(NestAnalysis& analysis): analysis_(analysis){}
+        Displayer(NestAnalysis& analysis, const SymbolTable* symbol_table_ = nullptr)
+        : analysis_(analysis), symbol_table_(symbol_table_) {}
         void display() {analysis_.mapping_.root->accept(this);}
     };
 
@@ -330,13 +334,16 @@ namespace TileFlow {
     };
 
     class LoopNestConstructor: public mapping::TileFlow::Visitor {
+        NestAnalysis& analysis_;
+        const SymbolTable* symbol_table_;
+
         void visitTile(const TileNode* node) override { 
-            analysis_.configs[node].loop_nest = node->constructLoopNest();
+            analysis_.configs[node].loop_nest = node->constructLoopNest(symbol_table_);
             for (auto child: node->get_children()) {child->accept(this);}
         }
-        NestAnalysis& analysis_;
     public:
-        LoopNestConstructor(NestAnalysis& analysis): analysis_(analysis){}
+        LoopNestConstructor(NestAnalysis& analysis, const SymbolTable*symbol_table_)
+        : analysis_(analysis), symbol_table_(symbol_table_){}
         void construct(const Node* root) {root->accept(this);}
     };
 
@@ -347,7 +354,7 @@ namespace TileFlow {
         NestAnalysis& analysis_;
     public: 
         StorageLevelCalculator(NestAnalysis& analysis): analysis_(analysis){
-            if (verbose_level) {
+            if (verbose_level > 1) {
                 std::cout << "Begin storge level calculation..." << std::endl;
                 std::cout << "\tfanoutX: ";
                 for (auto& kv: analysis_.mapping_.fanoutX_map)

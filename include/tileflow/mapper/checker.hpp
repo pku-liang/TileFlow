@@ -11,18 +11,7 @@ using mapping::TileFlow::ScopeNode;
 using mapping::TileFlow::Visitor;
 
 namespace TileFlow {
-
-    struct Constraint {
-        enum {
-            LOOPCOUNT,
-            MEM, 
-            SPATIAL
-        }type_; 
-        std::shared_ptr<Expr> expr;
-        std::string msg;
-        std::string short_msg = "";
-    };
-
+    
     class ShapeConstraintParser: public Visitor {
         void visitTile(const TileNode*) override;
         void visitOp(const OpNode*) override;

@@ -18,12 +18,10 @@ namespace analysis
             const problem::TileFlow::Workloads& workloads_, 
             const mapping::TileFlow::Mapping& mapping_, 
             const model::Engine::Specs& arch_specs_, 
-            const model::Topology& topology_, 
-            const SymbolTable* symb_table_)
+            const model::Topology& topology_)
             : workloads_(workloads_), mapping_(mapping_), arch_specs_(arch_specs_), 
-            topology_(topology_), common_workload_(workloads_.get_workload()), 
-            symb_table_(symb_table_){
-            if (verbose_level) {
+            topology_(topology_), common_workload_(workloads_.get_workload()){
+            if (verbose_level > 1) {
                 std::cout << "begin analysis..." << std::endl;
                 common_workload_.Show();
             }
@@ -32,15 +30,23 @@ namespace analysis
 
         void NestAnalysis::get_loopnest()
         {
-            LoopNestConstructor(*this).construct(mapping_.root);
+            LoopNestConstructor(*this, symb_table_).construct(mapping_.root);
+        }
+
+        void NestAnalysis::reset() {
+            cycle_ = 0;
+            energy_ = 0;
+            configs.clear();
+            tiles_.clear();
         }
 
         void NestAnalysis::analyze()
         {
+            reset();
             get_loopnest();
             get_dimscale();
             get_storage_level();
-            get_spatial_offsets();
+            get_spatial_offsets(); // depends on get_loopnest
             get_expansion();
             get_datamovement();
         }
@@ -77,7 +83,7 @@ namespace analysis
         void NestAnalysis::Print()
         {
             std::cout << "-----------------Nest Analysis----------------" << std::endl;
-            Displayer(*this).display();
+            Displayer(*this, symb_table_).display();
             std::cout << "Cycle: " << cycle_
                     << ", Energy: " << energy_
                      << std::endl;
@@ -101,57 +107,59 @@ namespace analysis
             file << "metric,value" << std::endl;
             file << "Cycle," << cycle_ << std::endl;
             file << "Energy," << energy_ << std::endl;
-            if (verbose_level)
+            if (verbose_level > 1)
                 std::cout << "[TileFlow]: result written into " << filename << std::endl;
             file.close();
         }
 
         void Displayer::visitTile(const TileNode *node)
         {
-            std::cout << prefix_ << "Tile:" << std::endl;
             auto &configs_ = analysis_.configs;
-            if (configs_.count(node))
-            {
-                auto &config = configs_[node];
-                std::cout << prefix_ << "storage:" << node->get_storage_name();
-                std::cout << ", fanout:" << config.fanout_x << "," << config.fanout_y << std::endl;
-                std::cout << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
-                std::cout << prefix_ << "l-fanout" << config.logical_x << "," << config.logical_y << std::endl;
-                std::cout << prefix_ << "repFactor:" << config.replication_factor << std::endl;
-                std::cout << prefix_ << "strides:" << std::endl;
-                for (unsigned i = 0; i < config.loop_nest.loops.size(); i++) {
-                    std::cout << prefix_ << config.loop_nest.loops[i].PrintCompact() << ":" 
-                        << config.vector_strides_[i] << std::endl;
-                }
-                for (auto& kv: config.stats_) {
-                    std::cout << prefix_ << "<";
-                    for (auto&x: kv.first) std::cout << x << ",";
-                    std::cout << "> max_size, link_transfer, access_stats: " << std::endl;
-                    for (int pv = 0; pv < (int) problem::GetShape()->NumDataSpaces; 
-                        pv++) {
-                        std::cout << prefix_ 
-                            << problem::GetShape()->DataSpaceIDToName.at(pv) << ":" 
-                            << kv.second.max_size_[pv] << "," 
-                            << kv.second.link_transfer_[pv] << ","
-                            << kv.second.access_stat_[pv];
+            if (verbose_level > 1) {
+                std::cout << prefix_ << "Tile:" << std::endl;
+                if (configs_.count(node))
+                {
+                    auto &config = configs_[node];
+                    std::cout << prefix_ << "storage:" << node->get_storage_name();
+                    std::cout << ", fanout:" << config.fanout_x << "," << config.fanout_y << std::endl;
+                    std::cout << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
+                    std::cout << prefix_ << "l-fanout" << config.logical_x << "," << config.logical_y << std::endl;
+                    std::cout << prefix_ << "repFactor:" << config.replication_factor << std::endl;
+                    std::cout << prefix_ << "strides:" << std::endl;
+                    for (unsigned i = 0; i < config.loop_nest.loops.size(); i++) {
+                        std::cout << prefix_ << config.loop_nest.loops[i].PrintCompact() << ":" 
+                            << config.vector_strides_[i] << std::endl;
                     }
-                    std::cout << std::endl;
+                    for (auto& kv: config.stats_) {
+                        std::cout << prefix_ << "<";
+                        for (auto&x: kv.first) std::cout << x << ",";
+                        std::cout << "> max_size, link_transfer, access_stats: " << std::endl;
+                        for (int pv = 0; pv < (int) problem::GetShape()->NumDataSpaces; 
+                            pv++) {
+                            std::cout << prefix_ 
+                                << problem::GetShape()->DataSpaceIDToName.at(pv) << ":" 
+                                << kv.second.max_size_[pv] << "," 
+                                << kv.second.link_transfer_[pv] << ","
+                                << kv.second.access_stat_[pv];
+                        }
+                        std::cout << std::endl;
+                    }
                 }
-            }
-            if (analysis_.tiles_.count(node)) {
-                auto& info_ = analysis_.tiles_.at(node).data_movement_info;
-                std::cout << info_;
-                // std::cout << prefix_ << "size, read, fill, updates:" << std::endl; 
-                // for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces;   
-                //     pv ++) {
-                //     auto& info = info_[pv];
-                //     std::cout << prefix_ << "  " << problem::GetShape()->DataSpaceIDToName.at(pv)
-                //         << ": " << info.size << "," << info.reads << "," << info.fills
-                //         << "," << info.updates << std::endl;
-                // }
+                if (analysis_.tiles_.count(node)) {
+                    auto& info_ = analysis_.tiles_.at(node).data_movement_info;
+                    std::cout << info_;
+                    // std::cout << prefix_ << "size, read, fill, updates:" << std::endl; 
+                    // for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces;   
+                    //     pv ++) {
+                    //     auto& info = info_[pv];
+                    //     std::cout << prefix_ << "  " << problem::GetShape()->DataSpaceIDToName.at(pv)
+                    //         << ": " << info.size << "," << info.reads << "," << info.fills
+                    //         << "," << info.updates << std::endl;
+                    // }
+                }
             }
 
-            node->display(prefix_, false);
+            node->display(prefix_, false, symbol_table_);
             auto old_prefix = prefix_;
             for (int i = 0; i < (int)node->n_level(); ++i)
                 prefix_ += "   ";
@@ -159,11 +167,12 @@ namespace analysis
                 const_cast<Node *>(child)->accept(this);
             prefix_ = old_prefix;
         }
+
         void Displayer::visitScope(const ScopeNode *node)
         {
-            node->display(prefix_, false);
-            std::cout << "{" << std::endl;
+            node->display(prefix_, false, symbol_table_);
             std::string old_prefix = prefix_;
+            std::cout << prefix_ << "{" << std::endl;
             prefix_ += "   ";
             for (auto child : node->get_children())
                 const_cast<Node *>(child)->accept(this);
@@ -172,23 +181,25 @@ namespace analysis
         }
         void Displayer::visitOp(const OpNode *node)
         {
-            node->display(prefix_, false);
-            std::cout << prefix_ << "ComputeInfo:";
-            auto& config = analysis_.configs[node];
-            auto& info = config.stats_;
-            for (auto& kv: info) {
-                std::cout << "<";
-                for (auto& idx: kv.first) std::cout << idx << ",";
-                std::cout << ">:";
-                std::cout << kv.second.compute_info_.accesses << "X" 
-                    << kv.second.compute_info_.replication_factor << ",";
+            node->display(prefix_, false, symbol_table_);
+            if (verbose_level > 1) {
+                std::cout << prefix_ << "ComputeInfo:";
+                auto& config = analysis_.configs[node];
+                auto& info = config.stats_;
+                for (auto& kv: info) {
+                    std::cout << "<";
+                    for (auto& idx: kv.first) std::cout << idx << ",";
+                    std::cout << ">:";
+                    std::cout << kv.second.compute_info_.accesses << "X" 
+                        << kv.second.compute_info_.replication_factor << ",";
+                }
+                auto& compute_info = analysis_.tiles_.at(node).compute_info;
+                std::cout << std::endl;
+                std::cout << prefix_<< "repFactor:" << compute_info.replication_factor << std::endl;
+                std::cout << prefix_<< "accesses:" << compute_info.accesses << std::endl;
+                std::cout << prefix_<< "expanison:" << compute_info.max_x_expansion 
+                    << "," << compute_info.max_y_expansion << std::endl;
             }
-            auto& compute_info = analysis_.tiles_.at(node).compute_info;
-            std::cout << std::endl;
-            std::cout << prefix_<< "repFactor:" << compute_info.replication_factor << std::endl;
-            std::cout << prefix_<< "accesses:" << compute_info.accesses << std::endl;
-            std::cout << prefix_<< "expanison:" << compute_info.max_x_expansion 
-                << "," << compute_info.max_y_expansion << std::endl;
         }
 
         
@@ -205,8 +216,17 @@ namespace analysis
                 child->accept(this);
                 auto cur_scale_ = cur_scales.top();
                 cur_scales.pop();
+                for (int i = 0; i < (int)cur_scale.size(); ++i) {
+                    auto x = cur_scale[i];
+                    auto y = cur_scale_[i];
+                    auto dim = problem::GetShape()->FactorizedDimensionIDToName.at(i);
+                    TILEFLOW_ASSERT((1 == x || 1 == y || x == y), dim << " mismatch " << x << " v.s. " << y << std::endl; 
+                        node->display("", true, analysis_.symb_table_);
+                        child->display("", true, analysis_.symb_table_);
+                        std::cerr);
+                }
                 std::transform(cur_scale.begin(), cur_scale.end(), cur_scale_.begin(),
-                               cur_scale.begin(), [](uint64_t x, uint64_t y)
+                               cur_scale.begin(), [this, node, child](uint64_t x, uint64_t y)
                                {
                         assert(1 == x || 1 == y || x == y);
                         return std::max(x,y); });
@@ -324,7 +344,7 @@ namespace analysis
             auto& config = analysis_.configs[node];
             config.logical_x = config.logical_y = 1;
             if (node->is_spatial()) {
-                for (auto loop: node->get_loops()) {
+                for (auto loop: config.loop_nest.loops) {
                     int loop_count = 
                         (loop.end - loop.start) / loop.stride;
                     if (loop::IsSpatialX(loop.spacetime_dimension)) {
@@ -349,14 +369,17 @@ namespace analysis
                 output_offset.y = config.logical_y;
                 output_offset.max_x = output_offset.x + config.logical_x; 
             }
-            // std::cout << "===========Offset Calculation=========" << std::endl;
-            // std::cout << "Node:" << std::endl;
-            // node->display("\t", false);
-            // std::cout << "input:" << init_offset << std::endl;
-            // std::cout << "output: " << output_offset << std::endl;
-            // std::cout << "fanout: " << config.fanout_x << "," << config.fanout_y << std::endl;
-            // std::cout << "storage_level:" << node->get_storage_name() << ", " << node->get_name() << ", " << node->get_storage_level() << std::endl;
-            // std::cout << "======================================" << std::endl;
+            if (verbose_level > 1) {
+                std::cout << "===========Offset Calculation=========" << std::endl;
+                std::cout << "Node:" << std::endl;
+                node->display("\t", false, analysis_.symb_table_);
+                std::cout << "input:" << init_offset << std::endl;
+                std::cout << "output: " << output_offset << std::endl;
+                std::cout << "fanout: " << config.fanout_x << "," << config.fanout_y << std::endl;
+                std::cout << "logical:" << config.logical_x << "," << config.logical_y << std::endl;
+                std::cout << "storage_level:" << node->get_storage_name() << ", " << node->get_name() << ", " << node->get_storage_level() << std::endl;
+                std::cout << "======================================" << std::endl;
+            }
             assert(output_offset.y <= config.fanout_y);
             assert(output_offset.max_x <= config.fanout_x);
             output_offsets.push(output_offset);
@@ -724,6 +747,7 @@ namespace analysis
                               ret);  // the ret val
             if (input_.num_epochs_) {
                 // overwrite the fanout and replication factor
+                TILEFLOW_ASSERT(ret.p_tile_, "spatial error" << std::endl; input_.curr_node_->display("", true, dm_.analysis_.symb_table_); std::cerr);
                 for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; ++pv){
                     auto& info = ret.p_tile_->data_movement_info[pv];
                     info.fanout = config_.fanout_x * config_.fanout_y;
@@ -975,7 +999,7 @@ namespace analysis
                     }
                 }
             }
-            if (verbose_level) {
+            if (verbose_level > 1) {
                 std::cout << "===========BEG LINK===========" << std::endl;
                 std::cout << "last working set:" << std::endl;
                 last_working_set.show();

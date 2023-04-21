@@ -105,15 +105,26 @@ int main(int argc, char* argv[])
 
   checker.display();
 
-  bool enable_mem_check_ = true;
-  bool enable_spatial_check_ = true;
-  if (root.exists("check")) {
-    auto checknode = root.lookup("check");
-    checknode.lookupValue("mem", enable_mem_check_);
-    checknode.lookupValue("spatial", enable_spatial_check_);
+  // bool enable_mem_check_ = true;
+  // bool enable_spatial_check_ = true;
+  // if (root.exists("check")) {
+  //   auto checknode = root.lookup("check");
+  //   checknode.lookupValue("mem", enable_mem_check_);
+  //   checknode.lookupValue("spatial", enable_spatial_check_);
+  // }
+
+  TileFlow::mapper::Objective obj = TileFlow::mapper::CYCLE;
+
+  if (root.exists("tileflow-mapper")) {
+    auto mapper = root.lookup("tileflow-mapper");
+    std::string objective;
+    if (mapper.lookupValue("objective", objective)){
+      if (objective == "cycle") obj = TileFlow::mapper::CYCLE;
+      else if (objective == "energy") obj = TileFlow::mapper::ENERGY;
+    }
   }
 
-  TileFlow::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, enable_mem_check_, enable_spatial_check_);
+  TileFlow::mapper::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, obj);
 
   mapper.search();
 

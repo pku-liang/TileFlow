@@ -77,7 +77,7 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
         TILEFLOW_WARNING("No permutation specified. Infer instead.");
     }
     
-    TILEFLOW_ASSERT(iters.size() == loop_bounds.size(), "permutation & factor iter mismatch");
+    TILEFLOW_ASSERT(iters.size() == loop_bounds.size(), "permutation " << buffer << " & factor iter mismatch");
 
     ParseStorageLevel(config);
 
@@ -243,13 +243,16 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
     return node;
 }
 
-void TileNode::display(std::string prefix, bool recursive) const{
+void TileNode::display(std::string prefix, bool recursive, const SymbolTable* symbol_table) const{
     display_active_tensors(prefix);
+    if (symbol_table == nullptr) symbol_table = & global_symbol_table_;
     for (auto& loop: loopnests_) {
         std::cout << prefix;
         std::cout << "for " << loop.name_ << " in [" << loop.start << ":";
         if (loop.end < 0) {
-            std::cout << global_symbol_table_.lookup(loop.end).name_;
+            auto& entry = symbol_table->lookup(loop.end);
+            std::cout << entry.name_;
+            if (entry.fixed_) std::cout << "(" << entry.value_ << ")";
         }
         else std::cout << loop.end; 
         std::cout << ")";
@@ -267,10 +270,10 @@ void TileNode::display(std::string prefix, bool recursive) const{
 
     if (recursive)
         for (auto child: children_)
-            child->display(prefix);
+            child->display(prefix, recursive, symbol_table);
 }
 
-void ScopeNode::display(std::string prefix, bool recursive) const{
+void ScopeNode::display(std::string prefix, bool recursive, const SymbolTable* symb_table) const{
     display_active_tensors(prefix);
     std::cout << prefix << "Scope: ";
     if (type == Sequential) std::cout << "Sequential";
@@ -279,13 +282,13 @@ void ScopeNode::display(std::string prefix, bool recursive) const{
     if (recursive) {
         std::cout << "{" << std::endl;
         for (auto child: children_) 
-            child->display(prefix + "  ");
+            child->display(prefix + "  ", recursive, symb_table);
         std::cout << prefix << "}" << std::endl;
     }
     else std::cout << std::endl;
 }
 
-void OpNode::display(std::string prefix, bool) const {
+void OpNode::display(std::string prefix, bool, const SymbolTable*) const {
     display_active_tensors(prefix);
     std::cout << prefix;
     p_workload->Print();

@@ -109,6 +109,24 @@ void Checker::check(){
     // this depends on get_active_tensors;
     get_memory_constraints();
     get_resource_constraints();
+    for (auto iter = constraints.begin(); iter != constraints.end(); ) {
+        auto& cons = *iter;
+        if (cons.type_ == Constraint::MEM || cons.type_ == Constraint::SPATIAL) {
+            TILEFLOW_ASSERT(cons.expr->eval(global_symbol_table_), cons.msg << "("; 
+                cons.expr->display(global_symbol_table_); std::cout << ") violated");
+        }
+        else if (cons.type_ == Constraint::LOOPCOUNT) {
+            auto cond = std::static_pointer_cast<CondExpr>(cons.expr);
+            auto r = cond->right_->eval(global_symbol_table_);
+            auto l = cond->left_->eval(global_symbol_table_);
+            TILEFLOW_ASSERT(r%l==0, cons.msg << "("; 
+                cons.expr->display(global_symbol_table_); std::cout << ") violated");
+        }
+        auto vars = VariableCollector()(cons.expr.get());
+        if (vars.empty())
+            iter = constraints.erase(iter);
+        else iter++;
+    }
 }
 
 void Checker::get_active_tensors(){

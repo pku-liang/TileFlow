@@ -1,8 +1,11 @@
 #include <iostream>
 #include <algorithm>
+#include <math.h>
+
 #include "tileflow/mapper/expr.hpp"
 #include "tileflow/common.hpp"
 #include "tileflow/mapper/op.hpp"
+
 
 using namespace TileFlow::Op;
 
@@ -65,11 +68,15 @@ void ProductExpr::display(const SymbolTable& symb_table) {
 }
 
 num_t VariableExpr::eval(const SymbolTable& symb_table) {
-    return symb_table.lookup(idx_).value_;
+    auto & entry = symb_table.lookup(idx_);
+    if (entry.fixed_) return entry.value_;
+    return 1;
 }
 
 void VariableExpr::display(const SymbolTable& symb_table) {
-    std::cout << symb_table.lookup(idx_).name_;
+    auto & entry = symb_table.lookup(idx_);
+    std::cout << entry.name_;
+    if (entry.fixed_) std::cout << "(" << entry.value_ << ")";
 }
 
 num_t ParameterExpr::eval(const SymbolTable& ) {
@@ -175,14 +182,239 @@ void PairCondExpr::display(const SymbolTable& symb_table) {
 num_t PairCondExpr::eval(const SymbolTable& symb_table) {
     auto limit = limit_->eval_pair(symb_table, 0);
     auto usage = expr_->eval_pair(symb_table, limit.second);
-    std::cout << "limit: " << limit.first << ", " << limit.second << ";";
-    std::cout << "usage: " << usage.first << ", " << usage.second << std::endl;
     return limit.first >= usage.first && limit.second >= usage.second;
 }
 
 std::pair<int, int> PairCondExpr::eval_pair(const SymbolTable& , int ){
     TILEFLOW_ERROR("NOT IMPLEMENTED ERROR");
     return {0,0};
+}
+
+std::set<num_t> get_candidates(num_t num) {
+    std::set<num_t> ret;
+    int square_root = std::sqrt(num);
+    for (int i = 1; i <= square_root; i++) {
+        if (num % i == 0) {
+            ret.insert(i);
+            ret.insert(num / i);
+        }
+    }
+    return ret;
+}
+
+void intersect(std::set<num_t>& s, const std::set<num_t>& t) {
+    auto is = s.begin(), it = t.begin();
+    while(is != s.end() && it != t.end()) {
+        while (it != t.end() && *it < *is) {it++;}
+        while (is != s.end() && *is < *it) {is = s.erase(is);}
+        if (it!= t.end() && is != s.end() && *it == *is) {
+            it++; is++;
+        }
+    }
+    while(is != s.end()) is = s.erase(is);
+}
+
+num_t gcd(num_t a, num_t b)
+{
+    if (a == 0)
+        return b;
+    return gcd(b % a, a);
+}
+
+bool SymbolTable::fail_check(const std::vector<Constraint>& constraints_) {
+    for (auto& cons: constraints_) {
+        if (cons.type_ == Constraint::MEM || cons.type_ == Constraint::SPATIAL) {
+            if (!cons.expr->eval(global_symbol_table_)) return true;
+        }
+        else if (cons.type_ == Constraint::LOOPCOUNT) {
+            auto cond = std::static_pointer_cast<CondExpr>(cons.expr);
+            auto vars = VariableCollector()(cons.expr.get(), [this](int idx){return !lookup(idx).fixed_;});
+            auto r = cond->right_->eval(global_symbol_table_);
+            auto l = cond->left_->eval(global_symbol_table_);
+            if ((vars.empty() && l != r) || (!vars.empty() && r % l != 0)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void SymbolTable::fix_and_update(int index, num_t value,
+        const std::vector<Constraint>& constraints_) {
+    assert(idx2values_.count(index));
+    auto& entry = idx2values_[index];
+    assert(entry.candidates_.count(value));
+    entry.value_ = value;
+    entry.fixed_ = true;
+
+    std::vector<std::shared_ptr<CondExpr> > lc_cons;
+    for (auto& cons: constraints_) {
+        if (cons.type_ == Constraint::LOOPCOUNT) 
+            lc_cons.push_back(std::static_pointer_cast<CondExpr>(cons.expr));
+    }
+    std::unordered_map<int, num_t> fixed;
+    for (auto cons: lc_cons) {
+        std::set<int> vars = VariableCollector()(cons.get(), [this, index](int idx)->bool
+            {return !lookup(idx).fixed_ || (idx == index);});
+        if(vars.count(index)) {
+            num_t lc = cons->right_->eval(*this) / cons->left_->eval(*this);
+            std::set<num_t> candidates = get_candidates(lc);
+            int a_index;
+            for (auto& idx: vars) {
+                if (idx == index) continue;
+                a_index = idx;
+                auto& entry = idx2values_[idx];
+                intersect(entry.candidates_, candidates);
+                if (entry.candidates_.size() == 1) {
+                    assert(*entry.candidates_.begin() == 1);
+                    entry.fixed_ = true;
+                    entry.value_ = 1;
+                }
+            }
+            if (vars.size() == 2) {
+                fixed[a_index] = lc;
+            }
+        }
+    }
+    for(auto& kv: fixed){
+        auto& entry = idx2values_[kv.first];
+        if ((entry.fixed_ == false && entry.candidates_.count(kv.second)) 
+        || (entry.fixed_ && entry.value_ == kv.second)) {
+            entry.fixed_ = true; 
+            entry.value_ = kv.second;
+            entry.candidates_ = {kv.second};
+        }
+        else {
+            entry.fixed_ = false;
+            entry.value_ = -1;
+            entry.candidates_ = {};
+        }
+    }
+    failed_ = fail_check(constraints_);
+}
+
+void SymbolTable::init(const std::vector<Constraint>& constraints_) {
+    std::vector<std::shared_ptr<CondExpr> > lc_cons; 
+    for (auto& cons: constraints_) {
+        if (cons.type_ == Constraint::LOOPCOUNT) 
+            lc_cons.push_back(
+                std::static_pointer_cast<CondExpr>(cons.expr));
+    }
+    std::unordered_map<int, std::vector<int> > candidates;
+    std::unordered_map<int, num_t> fixed;
+    for (auto cons: lc_cons) {
+        std::set<int> vars = VariableCollector()(cons.get());
+        num_t lc = cons->right_->eval(*this) / cons->left_->eval(*this);
+        for (auto& idx: vars) {
+            candidates[idx].push_back(lc);
+        }
+        if (vars.size() == 1) {
+            auto v = *vars.begin();
+            if (fixed.count(v) && lc != fixed[v])
+                fixed[v] = 0; 
+            else fixed[v] = lc;
+        }
+    }
+    
+    for (auto& kv: candidates) {
+        auto& entry = idx2values_[kv.first];
+        num_t g = kv.second.front();
+        for (int i = 1; i < (int)kv.second.size(); i++) 
+            g = gcd(g, kv.second[i]);
+        auto factors = get_candidates(g);
+        entry.candidates_.insert(factors.begin(), factors.end());
+        if (g == 1) {
+            assert(*entry.candidates_.begin() == 1);
+            entry.fixed_ = true;
+            entry.value_ = 1;
+        }
+    }
+
+    for(auto& kv: fixed){
+        auto& entry = idx2values_[kv.first];
+        if ((entry.fixed_ == false && entry.candidates_.count(kv.second)) 
+        || (entry.fixed_ && entry.value_ == kv.second)) {
+            entry.fixed_ = true; 
+            entry.value_ = kv.second;
+            entry.candidates_ = {kv.second};
+        }
+        else {
+            entry.fixed_ = false;
+            entry.value_ = -1;
+            entry.candidates_ = {};
+        }
+    }
+    failed_ = fail_check(constraints_);
+}
+
+int SymbolTable::get_next_var() const {
+    if (failed_) return 1;
+    size_t min_candidate = 1e3;
+    int var = 1;
+    for (auto& kv: idx2values_) {
+        if (!kv.second.fixed_ && (min_candidate > kv.second.candidates_.size())) {
+            min_candidate = kv.second.candidates_.size();
+            var = kv.first;
+            assert(var < 0);
+        }
+    }
+    return var;
+}
+
+
+void ExprVisitor::visitPairExpr(const PairExpr*expr){
+    expr->x_->accept(this);
+    expr->y_->accept(this);
+}
+void ExprVisitor::visitPairSumExpr(const PairSumExpr*expr){
+    for (auto& operand: expr->operands_) operand->accept(this);
+}
+void ExprVisitor::visitPairMaxExpr(const PairMaxExpr*expr){
+    for (auto& operand: expr->operands_) operand->accept(this);
+}
+void ExprVisitor::visitPairCondExpr(const PairCondExpr*expr){
+    expr->expr_->accept(this); expr->limit_->accept(this);
+}
+void ExprVisitor::visitProductExpr(const ProductExpr*expr){
+    for (auto& operand: expr->operands_) operand->accept(this);
+}
+void ExprVisitor::visitVariableExpr(const VariableExpr*){}
+
+void ExprVisitor::visitParameterExpr(const ParameterExpr*){}
+
+void ExprVisitor::visitCondExpr(const CondExpr*expr){
+    expr->left_->accept(this); expr->right_->accept(this);
+}
+void ExprVisitor::visitSumExpr(const SumExpr* expr) {
+    for (auto& operand: expr->operands_) operand->accept(this);
+}
+
+std::ostream& operator<< (std::ostream& o, const Entry& e) {
+    o << "(" << e.name_ << "," << e.fixed_ << "," << e.value_;
+    if (e.candidates_.size()) {
+        o << "{";
+        for (auto x: e.candidates_) 
+            o << x << ",";
+        o << "}";
+    }
+    o << ")";
+    return o;
+}
+
+std::ostream& operator<< (std::ostream& o, const SymbolTable& table) {
+    o << "=========Symbol Table=========" << std::endl;
+    for (int i = -1; i >= table.idx; i--) {
+        o << table.lookup(i) << std::endl;
+    }
+    o << "======End Symbol Table========" << std::endl;
+    return o;
+}
+
+void SymbolTable::show_brief(std::ostream& o) const {
+    for (int i = -1; i >= idx; i--) {
+        auto& entry = idx2values_.at(i);
+        o << "<" << entry.name_ << "," << entry.value_ << ">,";
+    }
 }
 
 } // namespaec TileFlow 

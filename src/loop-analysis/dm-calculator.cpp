@@ -89,7 +89,7 @@ namespace analysis
             energy_ += level->Energy();
             ret_stack_.push(ret);
             
-            if (verbose_level) {
+            if (verbose_level > 1) {
                 std::cout << "========BEG Compute Stat=========" << std::endl;
                 std::cout << input;
                 std::cout << ret;
@@ -163,7 +163,7 @@ namespace analysis
             input.curr_node_->accept(this);
             auto ret = ret_stack_.top();
             ret_stack_.pop();
-            if (verbose_level) {
+            if (verbose_level > 1) {
                 std::cout << "======ComputeDelta========" << std::endl;
                 std::cout << "------Node--------" << std::endl;
                 input.curr_node_->display("", false);
@@ -200,7 +200,7 @@ namespace analysis
             ret.p_tile_.reset();
 
 
-            if (verbose_level) {
+            if (verbose_level > 1) {
                 std::cout << "============BEG finalizeStat==============" << std::endl; 
                 std::cout << "storage_id:" << storage_id << std::endl;
                 storage_level->Print(std::cout); 

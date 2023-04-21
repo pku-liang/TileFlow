@@ -8,6 +8,8 @@
 
 #define TILEFLOW_WARNING(msg) do{std::cerr << "[WARNING]: " << msg << std::endl;}while(0)
 
+#define TILEFLOW_LOG(msg) do{std::cerr << "[LOG]: " << msg << std::endl;}while(0)
+
 #define TILEFLOW_COND_WARNING(cond, msg) do{if(!(cond)) {std::cerr << "[WARNING]: " << msg << std::endl;}}while(0)
 
 #include "compound-config/compound-config.hpp"
