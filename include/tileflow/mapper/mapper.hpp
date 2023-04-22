@@ -81,7 +81,6 @@ private:
     bool terminated_ = false;
     bool expanded_ = false;
     double best_reward_ = -1e9;
-    double reward_;
 
 public:
     Env(const std::vector<Constraint>& constraints, 
@@ -104,7 +103,7 @@ public:
     
     bool is_terminated() const {return terminated_;}
     bool is_expanded() const {return expanded_;}
-    double get_reward() const {return reward_;}
+    double get_reward();
     State* get_curr_state() const {return curr_state_;}
     const std::vector<Constraint>& get_constraints() const {return constraints_;}
     const SymbolTable* get_best_symbol_table() const {

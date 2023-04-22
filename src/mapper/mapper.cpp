@@ -12,6 +12,10 @@ const SymbolTable* Mapper::search() {
     std::string obj = obj_ == Objective::CYCLE? "cycle" : "energy";
     TILEFLOW_LOG("Optimize " << obj << "...");
     analysis::TileFlow::NestAnalysis analyzer(workloads_, mapping_, arch_specs_, topology_);
+    if (!global_symbol_table_.count_unfixed()){
+        optimum_ = global_symbol_table_;
+        return &optimum_;
+    }
     Env env(constraints_, global_symbol_table_, analyzer, obj_);
     MCTS mcts(&env, timeout_);
     mcts.search();
@@ -70,40 +74,44 @@ Action Env::step(bool random) {
     std::tie(act, expanded_) = curr_state_->select_action(random);
     curr_state_ = curr_state_->take_action(act, constraints_);
     terminated_ = curr_state_->is_terminated();
-    if (terminated_) {
-        if (curr_state_->n_visit > 0) {
-            reward_ = curr_state_->ave_reward;
-        }
-        else if (curr_state_->is_error_out()) {
-            reward_ = punish_;
-        }
-        else 
-        {
-            analyzer_.set_symbol_table(&curr_state_->symbol_table_);
-            if (verbose_level > 1) {
-                std::cout << "begin analyze..." << std::endl;
-                std::cout << "symbol table: ";
-                curr_state_->symbol_table_.show_brief(std::cout);
-                std::cout << std::endl;
-                analyzer_.Print();
-            }
-            analyzer_.analyze();
-            double value; 
-            if (obj_ == Objective::CYCLE) value = (double)(analyzer_.get_cycle());
-            else if (obj_ == Objective::ENERGY) value = (double)(analyzer_.get_energy());
-            reward_ = -std::log10(value);
-            
-            if (reward_ > best_reward_) {
-                TILEFLOW_LOG("Update best "; curr_state_->symbol_table_.show_brief(std::cerr); std::cerr 
-                    << " value: " <<  value);
-                best_reward_ = reward_;
-                best_symbol_table_ = &curr_state_->symbol_table_;
-            }
-        }
-        if (punish_ + 2 > reward_) 
-            punish_ = reward_ - 2;
-    }
     return act;
+}
+
+double Env::get_reward(){
+    assert(terminated_ && curr_state_->is_terminated());
+    double reward;
+    if (curr_state_->n_visit > 0) {
+        reward = curr_state_->ave_reward;
+    }
+    else if (curr_state_->is_error_out()) {
+        reward = punish_;
+    }
+    else 
+    {
+        analyzer_.set_symbol_table(&curr_state_->symbol_table_);
+        if (verbose_level > 1) {
+            std::cout << "begin analyze..." << std::endl;
+            std::cout << "symbol table: ";
+            curr_state_->symbol_table_.show_brief(std::cout);
+            std::cout << std::endl;
+            analyzer_.Print();
+        }
+        analyzer_.analyze();
+        double value; 
+        if (obj_ == Objective::CYCLE) value = (double)(analyzer_.get_cycle());
+        else if (obj_ == Objective::ENERGY) value = (double)(analyzer_.get_energy());
+        reward = -std::log10(value);
+        
+        if (reward > best_reward_) {
+            TILEFLOW_LOG("Update best "; curr_state_->symbol_table_.show_brief(std::cerr); std::cerr 
+                << " value: " <<  value);
+            best_reward_ = reward;
+            best_symbol_table_ = &curr_state_->symbol_table_;
+        }
+    }
+    if (punish_ + 2 > reward) 
+        punish_ = reward - 2;
+    return reward;
 }
 
 State* MCTS::select_state() {
@@ -149,14 +157,14 @@ void MCTS::back_prop(State* state, double reward){
 void MCTS::search() {
     start_timer();
     for (int i = 0; i < n_iteration; i++ ) {
-        if (!n_unexplored) {
-            if (verbose_level) 
-                std::cout << "MCTS: finished searching after " << i << std::endl;
-            return;
-        }
         auto state = select_state();
         double reward = rollout(state);
         back_prop(state, reward); 
+        if (!n_unexplored) {
+            if (verbose_level) 
+                std::cout << "MCTS: finished searching after " << i + 1 << " rounds" << std::endl;
+            return;
+        }
         if (get_elapsed_time() > timeout_) {
             TILEFLOW_LOG("MCTS exit becuase of timeout.");
             return;
