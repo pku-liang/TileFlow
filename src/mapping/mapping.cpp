@@ -18,13 +18,13 @@ void Node::add_child(const Node* child){
         unsigned storage_level;
         std::string storage_level_name = "Unknown";
         if (child->get_type() == Node::Tile) {
-            if (static_cast<const TileNode*>(child)->get_tile_type() == TileNode::Temporal){
-                storage_level = child->get_storage_level() + 1;
-            }
-            else {
+            // if (static_cast<const TileNode*>(child)->get_tile_type() == TileNode::Temporal){
+            //     storage_level = child->get_storage_level() + 1;
+            // }
+            // else {
                 storage_level = child->get_storage_level();
                 storage_level_name = child->get_storage_name();
-            }
+            // }
         }
         else if (child->get_type() == Node::Scope) {
             storage_level = child->get_storage_level();

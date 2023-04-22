@@ -103,8 +103,8 @@ double Env::get_reward(){
         reward = -std::log10(value);
         
         if (reward > best_reward_) {
-            TILEFLOW_LOG("Update best "; curr_state_->symbol_table_.show_brief(std::cerr); std::cerr 
-                << " value: " <<  value);
+            TILEFLOW_LOG("Update best "; if (verbose_level) curr_state_->symbol_table_.show_brief(std::cerr); std::cerr 
+                    << " value: " <<  value);
             best_reward_ = reward;
             best_symbol_table_ = &curr_state_->symbol_table_;
         }

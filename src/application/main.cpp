@@ -111,7 +111,8 @@ int main(int argc, char* argv[])
   
   checker.check();
 
-  checker.display();
+  if (verbose_level)
+    checker.display();
 
   TileFlow::mapper::Objective obj = TileFlow::mapper::CYCLE;
   unsigned timeout = 600;
@@ -133,7 +134,7 @@ int main(int argc, char* argv[])
 
   TILEFLOW_LOG("Verify result...");
   checker.check(result);
-
+  
   mapper.report();
 
   if (root.exists("output")) {

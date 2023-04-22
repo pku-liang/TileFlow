@@ -471,6 +471,8 @@ void ResourceConstraintParser::add_constraint(const Node* node) {
     if (node->get_parent() == nullptr || 
     (node->get_parent()->get_type() == Node::Tile &&
     static_cast<const TileNode*>(node->get_parent())->get_tile_type() == TileNode::Temporal)) {
+        TILEFLOW_ASSERT(mapping_.fanoutX_map.count(node->get_storage_level()),
+        "No fanout infomation for " << node->get_name(); node->display("", false); std::cerr);
         auto fanout_x = mapping_.fanoutX_map.at(node->get_storage_level());
         auto fanout_y = mapping_.fanoutY_map.at(node->get_storage_level());
         constraints_.push_back(
