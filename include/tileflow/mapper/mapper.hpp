@@ -1,7 +1,7 @@
 #pragma once 
 
 #include <vector> 
-
+#include <chrono>
 #include "tileflow/mapper/checker.hpp"
 #include "tileflow/loop-analysis/nest-analysis.hpp"
 
@@ -52,7 +52,7 @@ struct State {
 
     State* take_action(const Action& action, const std::vector<Constraint>& constraints_);
 
-    inline bool is_terminated() const {return variable_index > 0 || candidate_factors_.size() == 0;}
+    inline bool is_terminated() const {return variable_index > 0;}
     inline bool is_error_out() const {
         return variable_index == ERROR_OUT;
     }
@@ -88,7 +88,7 @@ public:
         const SymbolTable& symbol_table, 
         analysis::TileFlow::NestAnalysis& analyzer,
         Objective obj): constraints_(constraints),
-    root_(new State(symbol_table, constraints)), best_symbol_table_(&symbol_table),
+    root_(new State(symbol_table, constraints)), best_symbol_table_(nullptr),
         analyzer_(analyzer), obj_(obj) {reset();
         if (verbose_level > 1) {    
         std::cout << "init env..." << std::endl;
@@ -121,12 +121,20 @@ private:
     int n_unexplored;
     Env* env_ = nullptr;
 
+    unsigned timeout_;
+    std::chrono::steady_clock::time_point begin_;
+    void start_timer() {begin_ = std::chrono::steady_clock::now();}
+    unsigned get_elapsed_time() {
+        auto cur = std::chrono::steady_clock::now();
+        return std::chrono::duration_cast<std::chrono::seconds> (cur - begin_).count();
+    }
+
     void back_prop(State* state, double reward);
     double rollout(State* state);
     State* select_state();
 
 public:
-    MCTS(Env* env): env_(env){
+    MCTS(Env* env, unsigned timeout = 120): env_(env), timeout_(timeout){
         n_unexplored = env_->get_curr_state()->candidate_factors_.size();
     }
     void search();
@@ -140,6 +148,7 @@ class Mapper {
     const model::Topology& topology_;
     SymbolTable optimum_;
     Objective obj_;
+    unsigned timeout_;
 
 public:
     Mapper(const std::vector<Constraint>& constraints_,
@@ -147,15 +156,15 @@ public:
         const mapping::TileFlow::Mapping& mapping_, 
         const model::Engine::Specs& arch_specs_, 
         const model::Topology& topology_, 
-        Objective obj):
+        Objective obj, unsigned timeout = 600):
         constraints_(constraints_), workloads_(workloads_), 
         mapping_(mapping_), arch_specs_(arch_specs_), 
-        topology_(topology_), obj_(obj) {
+        topology_(topology_), obj_(obj), timeout_(timeout) {
             global_symbol_table_.init(constraints_);
             std::cout << "begin mapping..." << std::endl; 
         }
     
-    const SymbolTable& search();
+    const SymbolTable* search();
 
     void dump(const std::string& filename);
 

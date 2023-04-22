@@ -101,7 +101,7 @@ void SpatialScopeSwapper::visitScope(const ScopeNode* node){
         child->accept(this);
 }
 
-void Checker::check(){
+void Checker::parse_constraints() {
     swap_spatial_scope();
     sanity_check();
     get_active_tensors();
@@ -109,23 +109,32 @@ void Checker::check(){
     // this depends on get_active_tensors;
     get_memory_constraints();
     get_resource_constraints();
-    for (auto iter = constraints.begin(); iter != constraints.end(); ) {
+}
+
+void Checker::check(const SymbolTable* symbol_table){ 
+    if (!constraints_parsed_) {
+        parse_constraints();
+        constraints_parsed_ = true;
+    }
+    if (symbol_table == nullptr) symbol_table = &global_symbol_table_;
+    for (auto iter = constraints.begin(); iter != constraints.end(); iter++) {
         auto& cons = *iter;
-        if (cons.type_ == Constraint::MEM || cons.type_ == Constraint::SPATIAL) {
-            TILEFLOW_ASSERT(cons.expr->eval(global_symbol_table_), cons.msg << "("; 
-                cons.expr->display(global_symbol_table_); std::cout << ") violated");
+        if ((cons.type_ == Constraint::MEM && enable_mem_check_) 
+        || (cons.type_ == Constraint::SPATIAL && enable_spatial_check_)) {
+            TILEFLOW_ASSERT(cons.expr->eval(*symbol_table), cons.msg << "("; 
+                cons.expr->display(*symbol_table); std::cout << ") violated");
         }
         else if (cons.type_ == Constraint::LOOPCOUNT) {
             auto cond = std::static_pointer_cast<CondExpr>(cons.expr);
-            auto r = cond->right_->eval(global_symbol_table_);
-            auto l = cond->left_->eval(global_symbol_table_);
+            auto r = cond->right_->eval(*symbol_table);
+            auto l = cond->left_->eval(*symbol_table);
             TILEFLOW_ASSERT(r%l==0, cons.msg << "("; 
-                cons.expr->display(global_symbol_table_); std::cout << ") violated");
+                cons.expr->display(*symbol_table); std::cout << ") violated");
         }
-        auto vars = VariableCollector()(cons.expr.get());
-        if (vars.empty())
-            iter = constraints.erase(iter);
-        else iter++;
+        // auto vars = VariableCollector()(cons.expr.get());
+        // if (vars.empty())
+        //     iter = constraints.erase(iter);
+        // else iter++;
     }
 }
 
@@ -239,16 +248,17 @@ void Checker::add_access_pattern(
     }
 }
 
-void Checker::display() {
+void Checker::display(const SymbolTable* symbol_table) {
+    if (symbol_table == nullptr) symbol_table = & global_symbol_table_;
     std::cout << "==============Checker BEG================" << std::endl;
     mapping_.Print();
     std::cout << "constraints:" << std::endl;
     for (auto& cons: constraints) {
         std::cout << "\t";
         
-        cons.expr->display(global_symbol_table_); 
-        if (verbose_level>1)
-            std::cout << "\t# " << cons.msg;
+        cons.expr->display(*symbol_table); 
+        // if (verbose_level>1)
+        std::cout << "\t# " << cons.msg;
         std::cout << std::endl;}
     std::cout << "==============Checker END================" << std::endl;
 }

@@ -192,6 +192,7 @@ void Node::ParseStorageLevel(config::CompoundConfigNode directive)
 
   storage_level_name_ = storage_level_name;
   storage_level_ = storage_level_id;
+  name_ += "::" + storage_level_name_;
 }
 
 OpNode::OpNode(config::CompoundConfigNode config): Node(Node::Op) {

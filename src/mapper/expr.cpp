@@ -224,7 +224,11 @@ num_t gcd(num_t a, num_t b)
 bool SymbolTable::fail_check(const std::vector<Constraint>& constraints_) {
     for (auto& cons: constraints_) {
         if (cons.type_ == Constraint::MEM || cons.type_ == Constraint::SPATIAL) {
-            if (!cons.expr->eval(*this)) return true;
+            if (!cons.expr->eval(*this)){
+                if (verbose_level)
+                    TILEFLOW_LOG("Search end because of cond check failure: " << cons.msg);
+                return true;
+            } 
         }
         else if (cons.type_ == Constraint::LOOPCOUNT) {
             auto cond = std::static_pointer_cast<CondExpr>(cons.expr);
@@ -232,6 +236,8 @@ bool SymbolTable::fail_check(const std::vector<Constraint>& constraints_) {
             auto r = cond->right_->eval(*this);
             auto l = cond->left_->eval(*this);
             if ((vars.empty() && l != r) || (!vars.empty() && r % l != 0)) {
+                if (verbose_level)
+                    TILEFLOW_LOG("Search end because of cond check failure: " << cons.msg);
                 return true;
             }
         }
@@ -356,6 +362,10 @@ int SymbolTable::get_next_var() const {
         if (!kv.second.fixed_ && (min_candidate > kv.second.candidates_.size())) {
             min_candidate = kv.second.candidates_.size();
             var = kv.first;
+            if (min_candidate == 0) {
+                TILEFLOW_LOG("ERROR OUT at " << kv.second.name_; std::cerr);
+                return ERROR_OUT;
+            }
         }
     }
     return var;

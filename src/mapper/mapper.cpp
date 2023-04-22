@@ -8,18 +8,18 @@ namespace TileFlow {
 
 namespace mapper {
 
-const SymbolTable& Mapper::search() {
+const SymbolTable* Mapper::search() {
     std::string obj = obj_ == Objective::CYCLE? "cycle" : "energy";
     TILEFLOW_LOG("Optimize " << obj << "...");
     analysis::TileFlow::NestAnalysis analyzer(workloads_, mapping_, arch_specs_, topology_);
     Env env(constraints_, global_symbol_table_, analyzer, obj_);
-    MCTS mcts(&env);
+    MCTS mcts(&env, timeout_);
     mcts.search();
     auto ret = env.get_best_symbol_table();
     TILEFLOW_ASSERT(ret, "no candidate found");
     TILEFLOW_LOG("best factors: "; ret->show_brief(std::cout); std::cerr);
     optimum_ = *ret;
-    return optimum_;
+    return &optimum_;
 }
 
 void Mapper::dump(const std::string & filename){
@@ -34,8 +34,7 @@ void Mapper::dump(const std::string & filename){
     file << "metric,value" << std::endl;
     file << "Cycle," << analysis.get_cycle() << std::endl;
     file << "Energy," << analysis.get_energy() << std::endl;
-    if (verbose_level)
-        std::cout << "[TileFlow]: result written into " << filename << std::endl;
+    TILEFLOW_LOG("result written into " << filename);        
     file.close();
 }
 
@@ -66,6 +65,7 @@ void Mapper::report() {
 
 Action Env::step(bool random) {
     assert(!terminated_);
+    assert(curr_state_->candidate_factors_.size());
     Action act; 
     std::tie(act, expanded_) = curr_state_->select_action(random);
     curr_state_ = curr_state_->take_action(act, constraints_);
@@ -120,7 +120,7 @@ State* MCTS::select_state() {
     if (env_->is_expanded()) {
         n_unexplored +=
             curr_state->candidate_factors_.size()-1;
-        TILEFLOW_LOG("Expand state has " << curr_state->candidate_factors_.size() << " child.");
+        // TILEFLOW_LOG("Expand state has " << curr_state->candidate_factors_.size() << " child.");
     }
     // std::cout << "---end state selection---" << std::endl << std::endl;
     return curr_state;
@@ -147,6 +147,7 @@ void MCTS::back_prop(State* state, double reward){
 }
 
 void MCTS::search() {
+    start_timer();
     for (int i = 0; i < n_iteration; i++ ) {
         if (!n_unexplored) {
             if (verbose_level) 
@@ -155,7 +156,11 @@ void MCTS::search() {
         }
         auto state = select_state();
         double reward = rollout(state);
-        back_prop(state, reward);
+        back_prop(state, reward); 
+        if (get_elapsed_time() > timeout_) {
+            TILEFLOW_LOG("MCTS exit becuase of timeout.");
+            return;
+        }
     }
 }
 

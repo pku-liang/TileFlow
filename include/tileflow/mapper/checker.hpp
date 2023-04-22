@@ -80,13 +80,18 @@ namespace TileFlow {
 
     class Checker { 
     private: 
+        bool constraints_parsed_ = false;
         const problem::TileFlow::Workloads& workloads_;
         const mapping::TileFlow::Mapping& mapping_;
         const model::Topology& topology_;
+        bool enable_mem_check_;
+        bool enable_spatial_check_;
+
         std::vector<Constraint > constraints;
         void swap_spatial_scope();
         void get_active_tensors();
         void sanity_check();
+        void parse_constraints();
         void get_shape_constraints();
         void get_memory_constraints();
         void get_resource_constraints();
@@ -98,11 +103,14 @@ namespace TileFlow {
     public:
         Checker(const problem::TileFlow::Workloads& workloads,
             const mapping::TileFlow::Mapping& mapping,
-            const model::Topology& topology)
-            : workloads_(workloads), mapping_(mapping), topology_(topology){}
+            const model::Topology& topology,
+            bool enable_mem_check_ = true,
+            bool enable_spatial_check_ = true)
+            : workloads_(workloads), mapping_(mapping), topology_(topology), 
+            enable_mem_check_(enable_mem_check_), enable_spatial_check_(enable_spatial_check_){}
         const std::vector<Constraint>& get_constraints() const {return constraints;}
-        void check();
-        void display();
+        void check(const SymbolTable* symbol_table = nullptr);
+        void display(const SymbolTable* symbol_table = nullptr);
     }; // Mappert 
 
 } // namespace TileFlow 

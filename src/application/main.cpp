@@ -99,21 +99,22 @@ int main(int argc, char* argv[])
   if (TileFlow::verbose_level)
     mapping.Print();
 
-  TileFlow::Checker checker(workloads, mapping, topology);
+  bool enable_mem_check_ = true;
+  bool enable_spatial_check_ = true;
+  if (root.exists("check")) {
+    auto checknode = root.lookup("check");
+    checknode.lookupValue("mem", enable_mem_check_);
+    checknode.lookupValue("spatial", enable_spatial_check_);
+  }
+
+  TileFlow::Checker checker(workloads, mapping, topology, enable_mem_check_, enable_spatial_check_);
   
   checker.check();
 
   checker.display();
 
-  // bool enable_mem_check_ = true;
-  // bool enable_spatial_check_ = true;
-  // if (root.exists("check")) {
-  //   auto checknode = root.lookup("check");
-  //   checknode.lookupValue("mem", enable_mem_check_);
-  //   checknode.lookupValue("spatial", enable_spatial_check_);
-  // }
-
   TileFlow::mapper::Objective obj = TileFlow::mapper::CYCLE;
+  unsigned timeout = 600;
 
   if (root.exists("tileflow-mapper")) {
     auto mapper = root.lookup("tileflow-mapper");
@@ -122,19 +123,25 @@ int main(int argc, char* argv[])
       if (objective == "cycle") obj = TileFlow::mapper::CYCLE;
       else if (objective == "energy") obj = TileFlow::mapper::ENERGY;
     }
+    mapper.lookupValue("timeout", timeout);
   }
 
-  TileFlow::mapper::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, obj);
+  TileFlow::mapper::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, obj, timeout);
 
-  mapper.search();
+  auto result = mapper.search();
+  assert(result);
+
+  TILEFLOW_LOG("Verify result...");
+  checker.check(result);
 
   mapper.report();
 
-  // if (root.exists("output")) {
-  //   std::string filename;
-  //   root.lookupValue("output", filename);
-  //   mapper.dump(filename);
-  // }
+  if (root.exists("output")) {
+    std::string filename;
+    root.lookupValue("output", filename);
+    mapper.dump(filename);
+  }
+
   /*
   analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_, topology_);
   analysis.analyze();
