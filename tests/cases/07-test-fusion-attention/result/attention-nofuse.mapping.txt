@@ -1,0 +1,133 @@
+***Optimal Mapping:
+read: C K Q J V update: C J 
+Scope: Sequential{
+  read: C K Q update: C fill: C K Q write-back: C 
+  for M in [0:X1(2)), L2
+    for H in [0:X0(2)), L2
+      for B in [0:X(1)), L2
+        read: C K Q update: C fill: C K Q write-back: C 
+        for M in [0:X4(1)) (Spatial-X), L2
+          for H in [0:X3(3)) (Spatial-X), L2
+            for B in [0:X2(1)) (Spatial-X), L2
+              read: C K Q update: C fill: C K Q write-back: C 
+              for A in [0:X9(8)), L1
+                for L in [0:X8(16)), L1
+                  for M in [0:X7(256)), L1
+                    for H in [0:X6(2)), L1
+                      for B in [0:X5(1)), L1
+                        read: C K Q update: C fill: C K Q write-back: C 
+                        for A in [0:X11(8)) (Spatial-X), L1
+                          for L in [0:X10(32)) (Spatial-X), L1
+                            read: C K Q update: C fill: C K Q write-back: C 
+                            for A in [0:1), L0
+                              for L in [0:1), L0
+                                read: C K Q update: C fill: C K Q write-back: C 
+                                Op: ProduceC(K,Q,)->C
+
+  read: C J V update: J fill: C J V write-back: J 
+  for M in [0:X14(2)), L2
+    for H in [0:X13(3)), L2
+      for B in [0:X12(1)), L2
+        read: C D E F G I J V update: D E F G I J fill: C J V write-back: J 
+        Scope: Sequential{
+          read: C D update: D fill: C D write-back: D 
+          for M in [0:X17(2)) (Spatial-X), L2
+            for H in [0:X16(1)) (Spatial-X), L2
+              for B in [0:X15(1)) (Spatial-X), L2
+                read: C D update: D fill: C D write-back: D 
+                for L in [0:X21(256)), L1
+                  for M in [0:X20(128)), L1
+                    for H in [0:X19(4)), L1
+                      for B in [0:X18(1)), L1
+                        read: C D update: D fill: C D write-back: D 
+                        for L in [0:X22(2)) (Spatial-X), L1
+                          read: C D update: D fill: C D write-back: D 
+                          for L in [0:1), L0
+                            read: C D update: D fill: C D write-back: D 
+                            Op: ProduceD(C,)->D
+
+          read: C D E update: E fill: C D E write-back: E 
+          for M in [0:X25(2)) (Spatial-X), L2
+            for H in [0:X24(2)) (Spatial-X), L2
+              for B in [0:X23(1)) (Spatial-X), L2
+                read: C D E update: E fill: C D E write-back: E 
+                for L in [0:X29(4)), L1
+                  for M in [0:X28(128)), L1
+                    for H in [0:X27(2)), L1
+                      for B in [0:X26(1)), L1
+                        read: C D E update: E fill: C D E write-back: E 
+                        for L in [0:X30(128)) (Spatial-X), L1
+                          read: C D E update: E fill: C D E write-back: E 
+                          for L in [0:1), L0
+                            read: C D E update: E fill: C D E write-back: E 
+                            Op: ProduceE(D,C,)->E
+
+          read: E F update: F fill: E F write-back: F 
+          for M in [0:X33(2)) (Spatial-X), L2
+            for H in [0:X32(2)) (Spatial-X), L2
+              for B in [0:X31(1)) (Spatial-X), L2
+                read: E F update: F fill: E F write-back: F 
+                for L in [0:X37(256)), L1
+                  for M in [0:X36(128)), L1
+                    for H in [0:X35(2)), L1
+                      for B in [0:X34(1)), L1
+                        read: E F update: F fill: E F write-back: F 
+                        for L in [0:X38(2)) (Spatial-X), L1
+                          read: E F update: F fill: E F write-back: F 
+                          for L in [0:1), L0
+                            read: E F update: F fill: E F write-back: F 
+                            Op: ProduceF(E,)->F
+
+          read: F G update: G fill: F G write-back: G 
+          for M in [0:X41(4)) (Spatial-X), L2
+            for H in [0:X40(1)) (Spatial-X), L2
+              for B in [0:X39(1)) (Spatial-X), L2
+                read: F G update: G fill: F G write-back: G 
+                for L in [0:X45(128)), L1
+                  for M in [0:X44(64)), L1
+                    for H in [0:X43(4)), L1
+                      for B in [0:X42(1)), L1
+                        read: F G update: G fill: F G write-back: G 
+                        for L in [0:X46(4)) (Spatial-X), L1
+                          read: F G update: G fill: F G write-back: G 
+                          for L in [0:1), L0
+                            read: F G update: G fill: F G write-back: G 
+                            Op: ProduceG(F,)->G
+
+          read: F G I update: I fill: F G I write-back: I 
+          for M in [0:X49(4)) (Spatial-X), L2
+            for H in [0:X48(1)) (Spatial-X), L2
+              for B in [0:X47(1)) (Spatial-X), L2
+                read: F G I update: I fill: F G I write-back: I 
+                for L in [0:X53(32)), L1
+                  for M in [0:X52(64)), L1
+                    for H in [0:X51(4)), L1
+                      for B in [0:X50(1)), L1
+                        read: F G I update: I fill: F G I write-back: I 
+                        for L in [0:X54(16)) (Spatial-X), L1
+                          read: F G I update: I fill: F G I write-back: I 
+                          for L in [0:1), L0
+                            read: F G I update: I fill: F G I write-back: I 
+                            Op: ProduceI(G,F,)->I
+
+          read: I J V update: J fill: I J V write-back: J 
+          for M in [0:X57(2)) (Spatial-X), L2
+            for H in [0:X56(1)) (Spatial-X), L2
+              for B in [0:X55(1)) (Spatial-X), L2
+                read: I J V update: J fill: I J V write-back: J 
+                for L in [0:X62(128)), L1
+                  for N in [0:X61(4)), L1
+                    for M in [0:X60(128)), L1
+                      for H in [0:X59(4)), L1
+                        for B in [0:X58(1)), L1
+                          read: I J V update: J fill: I J V write-back: J 
+                          for L in [0:X64(4)) (Spatial-X), L1
+                            for N in [0:X63(16)) (Spatial-X), L1
+                              read: I J V update: J fill: I J V write-back: J 
+                              for L in [0:1), L0
+                                for N in [0:1), L0
+                                  read: I J V update: J fill: I J V write-back: J 
+                                  Op: ProduceJ(V,I,)->J
+
+        }
+}

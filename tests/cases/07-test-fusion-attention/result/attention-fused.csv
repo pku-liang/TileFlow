@@ -1,0 +1,139 @@
+,value
+Cycle,2490368
+Energy,1.08711e+11
+L2::Fill::V, 0
+L2::Update::V, 0
+L2::Read::V, 3.14573e+06
+L2::Fill::J, 0
+L2::Fill::I, 0
+L2::Update::I, 0
+L2::Fill::Q, 0
+L2::Read::K, 786432
+L2::Update, 3.14573e+06
+L2::Update::D, 0
+L2::Read::Q, 393216
+L2::Update::K, 0
+L2::Fill::C, 0
+L2::Fill::G, 0
+L2::Fill::F, 0
+L2::Update::C, 0
+L2::Fill::E, 0
+L2::Read::C, 0
+L2::Fill::D, 0
+L2::CapUtil, 8.64e-06
+L2::SpatialUtil, 1
+L2::SlowDown, 1.06645
+L2::Fill::K, 0
+L2::Accesses, 1.06168e+07
+L2::Update::Q, 0
+L2::Fill, 0
+L2::Read::D, 0
+L2::Read::E, 0
+L2::Update::J, 3.14573e+06
+L2::Update::G, 0
+L2::Update::E, 0
+L2::Read::J, 3.14573e+06
+L2::Update::F, 0
+L2::Read::F, 0
+L2::Read::G, 0
+L2::Read, 7.4711e+06
+L2::Read::I, 0
+L1::Fill::V, 786432
+L1::Update::V, 0
+L1::Read::V, 3.14573e+06
+L1::Fill::J, 786432
+L1::Fill::I, 786432
+L1::Update::I, 786432
+L1::Fill::Q, 98304
+L1::Read::K, 5.03316e+07
+L1::Update, 3.34479e+07
+L1::Update::D, 393216
+L1::Read::Q, 393216
+L1::Update::K, 0
+L1::Fill::C, 2.94912e+06
+L1::Fill::G, 1536
+L1::Fill::F, 1.17965e+06
+L1::Update::C, 2.51658e+07
+L1::Fill::E, 786432
+L1::Read::C, 3.14573e+07
+L1::Fill::D, 4608
+L1::CapUtil, 0.192
+L1::SpatialUtil, 1
+L1::SlowDown, 8.53516
+L1::Fill::K, 786432
+L1::Accesses, 5.16502e+08
+L1::Update::Q, 0
+L1::Fill, 8.16538e+06
+L1::Read::D, 494592
+L1::Read::E, 3.93216e+06
+L1::Update::J, 3.14573e+06
+L1::Update::G, 24576
+L1::Update::E, 3.14573e+06
+L1::Read::J, 3.14573e+06
+L1::Update::F, 786432
+L1::Read::F, 3.14573e+06
+L1::Read::G, 122880
+L1::Read, 1.00101e+08
+L1::Read::I, 3.93216e+06
+L0::Fill::V, 49149
+L0::Update::V, 0
+L0::Read::V, 393216
+L0::Fill::J, 49149
+L0::Fill::I, 49914
+L0::Update::I, 98304
+L0::Fill::Q, 49150
+L0::Read::K, 196608
+L0::Update, 1.2073e+06
+L0::Update::D, 393216
+L0::Read::Q, 196608
+L0::Update::K, 0
+L0::Fill::C, 53752
+L0::Fill::G, 2298
+L0::Fill::F, 3064
+L0::Update::C, 196608
+L0::Fill::E, 3835
+L0::Read::C, 688128
+L0::Fill::D, 4602
+L0::CapUtil, 0.25
+L0::SpatialUtil, 0.25
+L0::SlowDown, 1
+L0::Fill::K, 49150
+L0::Accesses, 1.89293e+09
+L0::Update::Q, 0
+L0::Fill, 314063
+L0::Read::D, 491520
+L0::Read::E, 101376
+L0::Update::J, 393216
+L0::Update::G, 24576
+L0::Update::E, 98304
+L0::Read::J, 393216
+L0::Update::F, 3072
+L0::Read::F, 125952
+L0::Read::G, 122880
+L0::Read, 3.20102e+06
+L0::Read::I, 491520
+mac::Flops, 1.2073e+06
+MEM::L0,1
+MEM::L1,0.136
+MEM::L0,0.666667
+MEM::L1,0.12825
+MEM::L0,1
+MEM::L1,0.5125
+MEM::L0,0.666667
+MEM::L1,0.128
+MEM::L0,0.666667
+MEM::L1,0.12825
+MEM::L0,1
+MEM::L1,0.128125
+MEM::L0,1
+MEM::L1,0.192
+MEM::L2,7.695e-06
+SPATIAL::L1,0.25
+SPATIAL::L1,0.00390625
+SPATIAL::L1,0.03125
+SPATIAL::L1,0.25
+SPATIAL::L1,0.0625
+SPATIAL::L1,0.0078125
+SPATIAL::L1,0.125
+SPATIAL::L2,1
+SPATIAL::L2,0.25
