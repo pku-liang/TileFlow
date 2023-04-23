@@ -25,6 +25,28 @@ using TileFlow::verbose_level;
 namespace analysis {
 
 namespace TileFlow {
+    struct DataMovement {
+    private:
+        // static const std::map<std::string, std::string> metrics_;
+        std::unordered_map<std::string, double> data_;
+    public: 
+        double& operator[](const std::string& metric) {
+            if (data_.count(metric) == 0) data_[metric] = 0.0;
+            return data_[metric];
+        }
+        void report(std::ostream&, const std::string&) const;
+    };
+
+    struct DataMovements {
+    private: 
+        std::unordered_map<std::string, DataMovement> data_;
+    public: 
+        DataMovement& operator[](const std::string & metric) {
+            return data_[metric];
+        }
+        void clear() {data_.clear();}
+        void report(std::ostream&) const;
+    };
 
     struct stat_t {
         problem::PerDataSpace<AccessStatMatrix> access_stat_;
@@ -64,6 +86,7 @@ namespace TileFlow {
 
         std::uint64_t cycle_;
         double energy_;
+        DataMovements data_movements_;
         
         /**
          * \brief sanity check
@@ -132,6 +155,7 @@ namespace TileFlow {
         void Export(const std::string& filename);
         std::uint64_t get_cycle() const {return cycle_;}
         double get_energy() const {return energy_;}
+        const DataMovements& get_data_movements() const {return data_movements_;}
         friend class Displayer;
         friend class DatamovementCalculator;
         friend class DimScaleCalculator;

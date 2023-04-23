@@ -35,36 +35,41 @@ void Mapper::dump(const std::string & filename){
     if (tmp == std::string::npos || filename.substr(tmp) != ".csv")
         file.open(filename + ".csv");
     else file.open(filename);
-    file << "metric,value" << std::endl;
-    file << "Cycle," << analysis.get_cycle() << std::endl;
-    file << "Energy," << analysis.get_energy() << std::endl;
+    
+    report_csv(file);
+
     TILEFLOW_LOG("result written into " << filename);        
     file.close();
 }
 
 void Mapper::report() {
+    std::cout << "***TileFlow Result" << std::endl;
+    report_csv(std::cout);
+    std::cout << "***TileFlow Result Ends" << std::endl;
+}
+
+void Mapper::report_csv(std::ostream& o) {
     analysis::TileFlow::NestAnalysis analysis(workloads_, mapping_, arch_specs_, topology_);
     analysis.set_symbol_table(&optimum_);
     analysis.analyze();
-    std::cout << "***TileFlow Result" << std::endl;
-    std::cout << ",value" << std::endl;
-    std::cout << "Cycle," << analysis.get_cycle() << std::endl;
-    std::cout << "Energy," << analysis.get_energy() << std::endl;
+    o << ",value" << std::endl;
+    o << "Cycle," << analysis.get_cycle() << std::endl;
+    o << "Energy," << analysis.get_energy() << std::endl;
+    analysis.get_data_movements().report(o);
     for (auto & constraint: constraints_) {
         if(constraint.type_ == Constraint::MEM) {
-            std::cout << "MEM::" << constraint.short_msg << ",";
+            o << "MEM::" << constraint.short_msg << ",";
             auto expr = std::static_pointer_cast<CondExpr>(constraint.expr);
-            std::cout << expr->left_->eval(optimum_) / (expr->right_->eval(optimum_) + 0.0) << std::endl;
+            o << expr->left_->eval(optimum_) / (expr->right_->eval(optimum_) + 0.0) << std::endl;
         }
         else if (constraint.type_ == Constraint::SPATIAL) {
             auto expr = std::static_pointer_cast<PairCondExpr>(constraint.expr);
             auto limit = expr->limit_->eval_pair(optimum_, 0);
             auto usage = expr->expr_->eval_pair(optimum_, limit.second);
-            std::cout << "SPATIAL::" << constraint.short_msg << ",";
-            std::cout << (usage.first * usage.second + 0.0) / (limit.first * limit.second) << std::endl;
+            o << "SPATIAL::" << constraint.short_msg << ",";
+            o << (usage.first * usage.second + 0.0) / (limit.first * limit.second) << std::endl;
         }
     }
-    std::cout << "***TileFlow Result Ends" << std::endl;
 }
 
 Action Env::step(bool random) {

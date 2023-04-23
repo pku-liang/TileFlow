@@ -148,6 +148,7 @@ class Mapper {
     SymbolTable optimum_;
     Objective obj_;
     unsigned timeout_;
+    void report_csv(std::ostream&);
 
 public:
     Mapper(const std::vector<Constraint>& constraints_,
@@ -168,6 +169,8 @@ public:
     void dump(const std::string& filename);
 
     void report();
+
+    
 
 };
 

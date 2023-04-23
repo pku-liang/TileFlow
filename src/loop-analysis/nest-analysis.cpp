@@ -38,6 +38,7 @@ namespace analysis
             energy_ = 0;
             configs.clear();
             tiles_.clear();
+            data_movements_.clear();
         }
 
         void NestAnalysis::analyze()

@@ -7,6 +7,19 @@ namespace analysis
     namespace TileFlow
     {
 
+        void DataMovements::report(std::ostream& o) const {
+            for(auto& kv: data_) {
+                kv.second.report(o, kv.first);
+            }
+        }
+    
+        void DataMovement::report(std::ostream&o, const std::string& prefix) const {
+            for (auto& kv: data_) {
+                o << prefix << "::" << kv.first << ", " << kv.second;
+                o << std::endl;
+            }
+        }
+
         RetVal DatamovementCalculator::eval(const Node *root)
         {
             break_on_failure = false;
@@ -88,6 +101,9 @@ namespace analysis
             ret.cycle_ = level->Cycles();
             energy_ += level->Energy();
             ret_stack_.push(ret);
+
+            auto& data_movement_ = analysis_.data_movements_[level->Name()];
+            data_movement_["Flops"] += level->Cycles(); 
             
             if (verbose_level > 1) {
                 std::cout << "========BEG Compute Stat=========" << std::endl;
@@ -186,6 +202,9 @@ namespace analysis
             storage_level->Evaluate(*ret.p_tile_, mask, 
                 0, 
                 ret.cycle_, break_on_failure);
+            assert(storage_level->Cycles() >= ret.cycle_);
+
+            double slow_down = storage_level->Cycles() / (0.0 + ret.cycle_);
             storage_level->FinalizeBufferEnergy();
             ret.cycle_ = storage_level->Cycles();
             energy_ += storage_level->Energy();
@@ -197,8 +216,23 @@ namespace analysis
             du_net->Evaluate(*ret.p_tile_, break_on_failure);
             assert(ret.p_tile_.unique());
             energy_ += rf_net->Energy() + du_net->Energy();
-            ret.p_tile_.reset();
 
+            auto& data_movement = analysis_.data_movements_[storage_level->Name()];
+            auto& stat = storage_level->GetStats();
+            auto& specs = storage_level->GetSpecs();
+            data_movement["Accesses"] += storage_level->Accesses();
+            data_movement["SlowDown"] = std::max(data_movement["SlowDown"], slow_down);
+            data_movement["CapUtil"] = std::max(data_movement["CapUtil"], storage_level->CapacityUtilization());
+            data_movement["SpatialUtil"] = std::max(data_movement["SpatialUtil"], stat.utilized_instances.Max() / specs.instances.Get());
+            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; ++pv){
+                std::string suffix = "::" + problem::GetShape()->DataSpaceIDToName.at(pv);
+                data_movement["Read" + suffix] += (double)stat.reads.at(pv);
+                data_movement["Update" + suffix] += (double)stat.updates.at(pv);
+                data_movement["Fill" + suffix] += (double)stat.fills.at(pv);
+                data_movement["Read"] += (double)stat.reads.at(pv);
+                data_movement["Update"] += (double)stat.updates.at(pv);
+                data_movement["Fill"] += (double)stat.fills.at(pv);
+            }
 
             if (verbose_level > 1) {
                 std::cout << "============BEG finalizeStat==============" << std::endl; 
@@ -207,6 +241,7 @@ namespace analysis
                 std::cout << ret;
                 std::cout << "============END finalizeStat=============" << std::endl; 
             }
+            ret.p_tile_.reset();
         }
 
     } // namespace TileFlow

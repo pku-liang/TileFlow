@@ -134,6 +134,7 @@ int main(int argc, char* argv[])
 
   TILEFLOW_LOG("Verify result...");
   checker.check(result);
+  TILEFLOW_LOG("Check passed!");
   
   mapper.report();
 
