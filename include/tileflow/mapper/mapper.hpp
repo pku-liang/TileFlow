@@ -149,6 +149,7 @@ class Mapper {
     Objective obj_;
     unsigned timeout_;
     void report_csv(std::ostream&);
+    void report_mapping(std::ostream&);
 
 public:
     Mapper(const std::vector<Constraint>& constraints_,

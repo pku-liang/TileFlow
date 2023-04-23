@@ -287,11 +287,11 @@ void Workloads::Print() {
   std::cout << "------------End Workloads----------" << std::endl;
 }
 
-void Workload::Print() {
-  std::cout << "Op: " << name_;
-  std::cout << "(";
-  for (auto t: ins_) std::cout << t << ",";
-  std::cout << ")->" << out_ << std::endl;
+void Workload::Print(std::ostream& o) {
+  o << "Op: " << name_;
+  o << "(";
+  for (auto t: ins_) o << t << ",";
+  o << ")->" << out_ << std::endl;
 }
 
 void Workload::set_common_shape() {

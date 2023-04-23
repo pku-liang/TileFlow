@@ -224,14 +224,14 @@ void Checker::add_access_pattern(
             auto node = sp.top();
             sp.pop();
             if (problem::GetShape()->IsReadWriteDataSpace.at(producer_id)) {
-                node->get_active_tensors().read_tensors.push_back(producer_id);
+                node->get_active_tensors().read_tensors.insert(producer_id);
                 if (!sp.empty()) {
-                    sp.top()->get_active_tensors().fill_tensors.push_back(producer_id);
+                    sp.top()->get_active_tensors().fill_tensors.insert(producer_id);
                 }
             }
-            node->get_active_tensors().update_tensors.push_back(producer_id);
+            node->get_active_tensors().update_tensors.insert(producer_id);
             if (!sp.empty()) {
-                sp.top()->get_active_tensors().wb_tensors.push_back(producer_id);
+                sp.top()->get_active_tensors().wb_tensors.insert(producer_id);
             }
         }
     }
@@ -240,9 +240,9 @@ void Checker::add_access_pattern(
         while (!sc.empty()) {
             auto node = sc.top();
             sc.pop();
-            node->get_active_tensors().read_tensors.push_back(consumer_id);
+            node->get_active_tensors().read_tensors.insert(consumer_id);
             if (!sc.empty()) {
-                sc.top()->get_active_tensors().fill_tensors.push_back(consumer_id);
+                sc.top()->get_active_tensors().fill_tensors.insert(consumer_id);
             }
         }
     }

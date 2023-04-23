@@ -244,56 +244,56 @@ Node* RecursiveParse(config::CompoundConfigNode config) {
     return node;
 }
 
-void TileNode::display(std::string prefix, bool recursive, const SymbolTable* symbol_table) const{
-    display_active_tensors(prefix);
+void TileNode::display(std::string prefix, bool recursive, const SymbolTable* symbol_table, std::ostream& o) const{
+    display_active_tensors(prefix, o);
     if (symbol_table == nullptr) symbol_table = & global_symbol_table_;
     for (auto& loop: loopnests_) {
-        std::cout << prefix;
-        std::cout << "for " << loop.name_ << " in [" << loop.start << ":";
+        o << prefix;
+        o << "for " << loop.name_ << " in [" << loop.start << ":";
         if (loop.end < 0) {
             auto& entry = symbol_table->lookup(loop.end);
-            std::cout << entry.name_;
-            if (entry.fixed_) std::cout << "(" << entry.value_ << ")";
+            o << entry.name_;
+            if (entry.fixed_) o << "(" << entry.value_ << ")";
         }
-        else std::cout << loop.end; 
-        std::cout << ")";
+        else o << loop.end; 
+        o << ")";
         if (loop::IsSpatial(loop.spacetime_dimension))
         {
             if (loop::IsSpatialX(loop.spacetime_dimension))
-                std::cout << " (Spatial-X)";
+                o << " (Spatial-X)";
             else
-                std::cout << " (Spatial-Y)";
+                o << " (Spatial-Y)";
         }
-        std::cout << ", " << arch_props_.Specs().topology.GetStorageLevel(storage_level_)->level_name;
-        std::cout << std::endl;
+        o << ", " << arch_props_.Specs().topology.GetStorageLevel(storage_level_)->level_name;
+        o << std::endl;
         prefix += "  ";
     }
 
     if (recursive)
         for (auto child: children_)
-            child->display(prefix, recursive, symbol_table);
+            child->display(prefix, recursive, symbol_table, o);
 }
 
-void ScopeNode::display(std::string prefix, bool recursive, const SymbolTable* symb_table) const{
-    display_active_tensors(prefix);
-    std::cout << prefix << "Scope: ";
-    if (type == Sequential) std::cout << "Sequential";
-    else if (type == Parallel) std::cout << "Parallel";
-    else if (type == Pipeline) std::cout << "Pipeline";
+void ScopeNode::display(std::string prefix, bool recursive, const SymbolTable* symb_table, std::ostream& o) const{
+    display_active_tensors(prefix, o);
+    o << prefix << "Scope: ";
+    if (type == Sequential) o << "Sequential";
+    else if (type == Parallel) o << "Parallel";
+    else if (type == Pipeline) o << "Pipeline";
     if (recursive) {
-        std::cout << "{" << std::endl;
+        o << "{" << std::endl;
         for (auto child: children_) 
-            child->display(prefix + "  ", recursive, symb_table);
-        std::cout << prefix << "}" << std::endl;
+            child->display(prefix + "  ", recursive, symb_table, o);
+        o << prefix << "}" << std::endl;
     }
-    else std::cout << std::endl;
+    else o << std::endl;
 }
 
-void OpNode::display(std::string prefix, bool, const SymbolTable*) const {
-    display_active_tensors(prefix);
-    std::cout << prefix;
-    p_workload->Print();
-    std::cout << std::endl;
+void OpNode::display(std::string prefix, bool, const SymbolTable*, std::ostream& o) const {
+    display_active_tensors(prefix, o);
+    o << prefix;
+    p_workload->Print(o);
+    o << std::endl;
 }
 
 Mapping ParseAndConstruct(config::CompoundConfigNode config,

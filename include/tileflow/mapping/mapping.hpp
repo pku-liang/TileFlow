@@ -35,7 +35,7 @@ public:
 };
 
 struct ActiveTensor {
-    std::vector<problem::Shape::DataSpaceID> 
+    std::set<problem::Shape::DataSpaceID> 
     read_tensors, fill_tensors, update_tensors, wb_tensors;
 };
 
@@ -60,7 +60,7 @@ protected:
     void ParseStorageLevel(config::CompoundConfigNode config);
     std::unordered_map<std::string, std::pair<int, int> > ParseFactors(const std::string & factors);
     std::vector<std::string> ParsePermutations(const std::string& buffer);
-    void display_active_tensors(std::string prefix) const;
+    void display_active_tensors(std::string prefix, std::ostream& o = std::cout) const;
 
 public: 
     Node(type_t t_): type_(t_), name_(type2name_.at(t_)) {}
@@ -98,7 +98,7 @@ public:
     void set_parent(const Node* parent) const {parent_ = parent;}
     inline const Node* get_parent() const {return parent_;}
 
-    virtual void display(std::string prefix, bool = true, const SymbolTable* = nullptr) const {std::cout << prefix << std::endl;}
+    virtual void display(std::string prefix, bool = true, const SymbolTable* = nullptr, std::ostream& o = std::cout) const {o << prefix << std::endl;}
     virtual void accept(Visitor* visitor) const = 0;
     virtual ~Node() {for (auto node: children_) delete node;}
     friend class Visitor;
@@ -113,7 +113,7 @@ public:
         Pipeline
     };
     ScopeNode(config::CompoundConfigNode config);
-    void display(std::string prefix, bool recursive, const SymbolTable* = nullptr) const override;
+    void display(std::string prefix, bool recursive, const SymbolTable* = nullptr, std::ostream& = std::cout) const override;
     void accept(Visitor* visitor) const {visitor->visitScope(this);}
     ScopeNode::type_t get_scope_type() const {return type;}
 
@@ -137,7 +137,7 @@ private:
 
 public:
     TileNode(config::CompoundConfigNode config);
-    void display(std::string prefix, bool recursive, const SymbolTable* = nullptr) const override;
+    void display(std::string prefix, bool recursive, const SymbolTable* = nullptr, std::ostream& = std::cout) const override;
     void accept(Visitor* visitor) const {visitor->visitTile(this);}
     bool is_spatial() const {return type_ == Spatial;}
     bool is_multicast_enabled() const {return multicast_enabled_;}
@@ -154,7 +154,7 @@ class OpNode: public Node {
     std::shared_ptr<problem::TileFlow::Workload> p_workload;
 public:
     OpNode(config::CompoundConfigNode config);
-    void display(std::string prefix, bool recursive, const SymbolTable* = nullptr) const override;
+    void display(std::string prefix, bool recursive, const SymbolTable* = nullptr, std::ostream& = std::cout) const override;
     const std::string & get_name() const {return op_name_;}
     void accept(Visitor* visitor) const {visitor->visitOp(this);}
     const std::shared_ptr<problem::TileFlow::Workload>& get_workload() const {return p_workload;}

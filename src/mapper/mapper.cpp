@@ -30,22 +30,30 @@ void Mapper::dump(const std::string & filename){
     analysis::TileFlow::NestAnalysis analysis(workloads_, mapping_, arch_specs_, topology_);
     analysis.set_symbol_table(&optimum_);
     analysis.analyze();
-    std::ofstream file;
-    size_t tmp = filename.find_last_of('.');
-    if (tmp == std::string::npos || filename.substr(tmp) != ".csv")
-        file.open(filename + ".csv");
-    else file.open(filename);
-    
-    report_csv(file);
+    std::string prefix = filename.substr(0, filename.find_last_of("."));
 
-    TILEFLOW_LOG("result written into " << filename);        
+    std::ofstream file;
+    file.open(prefix + ".csv");
+    report_csv(file);
     file.close();
+    TILEFLOW_LOG("profiling written into " << prefix << ".csv");        
+
+    file.open(prefix + ".mapping.txt");
+    report_mapping(file);
+    file.close();
+    TILEFLOW_LOG("mapping written into " << prefix << ".mapping.txt");
 }
 
 void Mapper::report() {
+    report_mapping(std::cout);
     std::cout << "***TileFlow Result" << std::endl;
     report_csv(std::cout);
     std::cout << "***TileFlow Result Ends" << std::endl;
+}
+
+void Mapper::report_mapping(std::ostream& o){
+    o << "***Optimal Mapping:" << std::endl;
+    mapping_.root->display("", true, &optimum_, o);
 }
 
 void Mapper::report_csv(std::ostream& o) {

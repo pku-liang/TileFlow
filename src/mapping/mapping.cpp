@@ -86,34 +86,34 @@ loop::Nest TileNode::constructLoopNest(const SymbolTable* symbol_table_) const{
     return loop_nest;
 }
 
-void Node::display_active_tensors(std::string prefix) const {
+void Node::display_active_tensors(std::string prefix, std::ostream&o) const {
     bool isEmpty = active_tensors_.read_tensors.size()
         + active_tensors_.update_tensors.size()
         + active_tensors_.fill_tensors.size()
         + active_tensors_.wb_tensors.size();
     if (!isEmpty) return;
-    std::cout << prefix;
+    o << prefix;
     if (active_tensors_.read_tensors.size()) {
-        std::cout << "read: ";
+        o << "read: ";
         for (auto id: active_tensors_.read_tensors) 
-            std::cout << problem::GetShape()->DataSpaceIDToName.at(id) << " ";
+            o << problem::GetShape()->DataSpaceIDToName.at(id) << " ";
     }
     if (active_tensors_.update_tensors.size()) {
-        std::cout << "update: ";
+        o << "update: ";
         for (auto id: active_tensors_.update_tensors) 
-            std::cout << problem::GetShape()->DataSpaceIDToName.at(id) << " ";
+            o << problem::GetShape()->DataSpaceIDToName.at(id) << " ";
     }
     if (active_tensors_.fill_tensors.size()){
-        std::cout << "fill: ";
+        o << "fill: ";
         for (auto id: active_tensors_.fill_tensors) 
-            std::cout << problem::GetShape()->DataSpaceIDToName.at(id) << " ";
+            o << problem::GetShape()->DataSpaceIDToName.at(id) << " ";
     }
     if (active_tensors_.wb_tensors.size()) {
-        std::cout << "write-back: ";
+        o << "write-back: ";
         for (auto id: active_tensors_.wb_tensors) 
-            std::cout << problem::GetShape()->DataSpaceIDToName.at(id) << " ";
+            o << problem::GetShape()->DataSpaceIDToName.at(id) << " ";
     }
-    std::cout << std::endl;
+    o << std::endl;
 }
 
 } // namespace TileFlow

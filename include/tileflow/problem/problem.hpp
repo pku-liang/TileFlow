@@ -27,7 +27,7 @@ namespace TileFlow {
         inline const std::string & get_out() const {return out_;}
         inline const std::string & get_name() const {return name_;} 
         inline const problem::Workload::FactorizedBounds& get_factorized_bounds() {return factorized_bounds_;}
-        void Print();
+        void Print(std::ostream& o = std::cout);
         friend class Workloads;
         void set_common_shape();
     };
