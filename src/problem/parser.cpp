@@ -125,7 +125,7 @@ std::string ParseWorkload(config::CompoundConfigNode config, problem::TileFlow::
   workload.SetDensities(densities);
 
   // 3) set common shape
-  workload.set_common_shape();
+  // workload.set_common_shape();
 
   return name;
 }
@@ -141,6 +141,15 @@ void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads) {
   else {
     TILEFLOW_ERROR("No io found in problem.");  
   }
+
+  std::vector<std::string> dims;
+  if (config.exists("dimensions")) {
+    config.lookupArrayValue("dimensions", dims);
+  }
+  else {
+    TILEFLOW_ERROR("no dimensions passed for the workloads.");
+  }
+  workloads.set_dims(dims);
   
   if (config.exists("ops")) {
     auto ops = config.lookup("ops");
@@ -154,14 +163,6 @@ void ParseWorkloads(config::CompoundConfigNode config, Workloads& workloads) {
     std::shared_ptr<Workload> p_workload(new Workload(workloads));
     std::string name = problem::TileFlow::ParseWorkload(config, *p_workload);
     assert(workloads.add_workload(name, p_workload));
-  }
-
-  std::vector<std::string> dims;
-  if (config.exists("dimensions")) {
-    config.lookupArrayValue("dimensions", dims);
-  }
-  else {
-    TILEFLOW_ERROR("no dimensions passed for the workloads.");
   }
 
   if (config.exists("instance")) {
@@ -203,16 +204,37 @@ bool Workloads::add_workload(const std::string & name, std::shared_ptr<Workload>
     return false;
   }
 
+
   auto shape_ = workload->GetShape();
+  for (auto& kv: shape_->FlattenedDimensionNameToID) {
+    TILEFLOW_ASSERT(common_shape_.FlattenedDimensionNameToID.count(kv.first), 
+      "Op:" << name << "'s dimension " << kv.first <<  " is not declared in global scope.");
+  }
   for (auto& kv: shape_->DataSpaceIDToName) {
     std::string access_pattern_name = kv.second;
     if (common_shape_.DataSpaceNameToID.count(access_pattern_name)) {
       auto id = common_shape_.DataSpaceNameToID.at(access_pattern_name);
+      // TODO: there should be a check on the access pattern; 
       TILEFLOW_ASSERT(common_shape_.DataSpaceOrder[id] == shape_->DataSpaceOrder.at(kv.first),
       "tensor " << access_pattern_name << " has mismatched order");
       continue;
     }
+    auto& proj = shape_->Projections[kv.first];
     auto & id = common_shape_.NumDataSpaces;
+    assert(id == common_shape_.Projections.size());
+    common_shape_.Projections.emplace_back();
+    auto & new_proj = common_shape_.Projections.back();
+    for (auto& expr: proj) {
+      new_proj.emplace_back();
+      auto & new_expr = new_proj.back();
+      for (auto& term: expr) {
+        Shape::CoefficientID new_coeff_id = term.first == shape_->NumCoefficients? -1:
+        common_shape_.CoefficientNameToID[shape_->CoefficientIDToName.at(term.first)];
+        Shape::FactorizedDimensionID new_factorized_dim = 
+          common_shape_.FactorizedDimensionNameToID[shape_->FactorizedDimensionIDToName.at(term.second)];
+        new_expr.emplace_back(new_coeff_id, new_factorized_dim);
+      }
+    }
     common_shape_.DataSpaceOrder[id] = shape_->DataSpaceOrder.at(kv.first);
     common_shape_.IsReadWriteDataSpace[id] = shape_->IsReadWriteDataSpace.at(kv.first);
     common_shape_.DataSpaceIDToName[id] = access_pattern_name;
@@ -294,47 +316,15 @@ void Workload::Print(std::ostream& o) {
   o << ")->" << out_ << std::endl;
 }
 
-void Workload::set_common_shape() {
-  auto& common_shape_ = workloads_.common_shape_;
-  
-  for (auto& kv: shape_.FactorizedDimensionNameToID){
-    std::string iter = kv.first;
-    if (!common_shape_.FactorizedDimensionNameToID.count(iter)){
-      problem::Shape::FactorizedDimensionID factorized_id = common_shape_.NumFactorizedDimensions;
-      assert(!common_shape_.FactorizedToFlattened.count(factorized_id));
-      problem::Shape::FlattenedDimensionID flattened_id = common_shape_.NumFlattenedDimensions;
-      common_shape_.FactorizedDimensionIDToName[factorized_id] = iter;
-      common_shape_.FactorizedDimensionNameToID[iter] = factorized_id;
-      common_shape_.FlattenedDimensionIDToName[flattened_id] = iter;
-      common_shape_.FlattenedDimensionNameToID[iter] = flattened_id;
-      common_shape_.FlattenedToFactorized.push_back({factorized_id});
-      common_shape_.FactorizedToFlattened[factorized_id] = flattened_id;
-      common_shape_.NumFlattenedDimensions++;
-      common_shape_.NumFactorizedDimensions++;
-    }
-  }
-
-  for (auto& proj: shape_.Projections) {
-    common_shape_.Projections.emplace_back();
-    auto & new_proj = common_shape_.Projections.back();
-    for (auto& expr: proj) {
-      new_proj.emplace_back();
-      auto & new_expr = new_proj.back();
-      for (auto& term: expr) {
-        Shape::CoefficientID new_coeff_id = term.first == shape_.NumCoefficients? -1:
-        common_shape_.CoefficientNameToID[shape_.CoefficientIDToName[term.first]];
-        Shape::FactorizedDimensionID new_factorized_dim = common_shape_.FactorizedDimensionNameToID[shape_.FactorizedDimensionIDToName[term.second]];
-        new_expr.emplace_back(new_coeff_id, new_factorized_dim);
-      }
-    }
-  }
-
-  // provide a walk around; 
-  common_shape_.DefaultCoefficients[-1] = 1;
+void Workloads::set_factorized_bound(const std::string& dim, int bound) {
+  assert(common_shape_.FactorizedDimensionNameToID.count(dim));
+  factorized_bounds_[common_shape_.FactorizedDimensionNameToID[dim]] = bound;
 }
 
-void Workloads::set_factorized_bound(const std::string& dim, int bound) {
-  if (common_shape_.FactorizedDimensionNameToID.count(dim) == 0) {
+void Workloads::set_dims(const std::vector<std::string>& dims) {
+  assert(common_shape_.NumFlattenedDimensions == 0);
+  assert(common_shape_.NumFactorizedDimensions == 0);
+  for (auto& dim: dims) {
     common_shape_.FactorizedDimensionNameToID[dim] = common_shape_.NumFactorizedDimensions;
     common_shape_.FactorizedDimensionIDToName[common_shape_.NumFactorizedDimensions] = dim;
     common_shape_.FlattenedDimensionIDToName[common_shape_.NumFlattenedDimensions] = dim;
@@ -346,7 +336,6 @@ void Workloads::set_factorized_bound(const std::string& dim, int bound) {
     common_shape_.NumFlattenedDimensions ++;
     common_shape_.NumFactorizedDimensions ++;
   }
-  factorized_bounds_[common_shape_.FactorizedDimensionNameToID[dim]] = bound;
 }
 
 const problem::Workload& Workloads::get_workload() const {

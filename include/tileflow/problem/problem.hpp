@@ -29,7 +29,7 @@ namespace TileFlow {
         inline const problem::Workload::FactorizedBounds& get_factorized_bounds() {return factorized_bounds_;}
         void Print(std::ostream& o = std::cout);
         friend class Workloads;
-        void set_common_shape();
+        // void set_common_shape();
     };
 
     class Workloads{
@@ -48,7 +48,9 @@ namespace TileFlow {
         mutable bool workload_constructed_ = false;
 
     public:
-        Workloads() {common_shape_.UsesFlattening = false; coefficients_[-1] = 1;}
+        Workloads() {
+            common_shape_.UsesFlattening = false; coefficients_[-1] = 1; 
+            common_shape_.DefaultCoefficients[-1] = 1;}
         bool add_workload(const std::string& name, std::shared_ptr<problem::TileFlow::Workload>& workload);
         std::shared_ptr<problem::TileFlow::Workload> get_workload(const std::string & op_name) const {
             TILEFLOW_ASSERT(workloads_.count(op_name), op_name << " Not FOUND");
@@ -57,6 +59,7 @@ namespace TileFlow {
         void set_io(const std::vector<std::string>& ins, const std::vector<std::string>& outs);
         void set_coeffs(const config::CompoundConfigNode& coeffs);
         void set_factorized_bound(const std::string& dim, int bound);
+        void set_dims(const std::vector<std::string>& dims);
 
         void Print();
         

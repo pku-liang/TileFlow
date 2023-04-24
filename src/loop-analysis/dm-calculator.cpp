@@ -103,7 +103,8 @@ namespace analysis
             ret_stack_.push(ret);
 
             auto& data_movement_ = analysis_.data_movements_[level->Name()];
-            data_movement_["Flops"] += level->Cycles(); 
+            data_movement_["Flops"] += level->Cycles() * compute_info.replication_factor; 
+            data_movement_["Energy"] += level->Energy(); 
             
             if (verbose_level > 1) {
                 std::cout << "========BEG Compute Stat=========" << std::endl;
@@ -131,7 +132,7 @@ namespace analysis
                 static_cast<const TileNode*>(node->get_parent())->get_tile_type() != TileNode::Spatial)){
                 finalizeStat(node->is_spatial()? 
                     node->get_children().front()->get_storage_level():node->get_storage_level(),
-                     ret);
+                     ret, node->is_profile());
             }
             ret_stack_.push(ret);
         }
@@ -193,7 +194,7 @@ namespace analysis
             return ret;
         }
 
-        void DatamovementCalculator::finalizeStat(unsigned storage_id, RetVal& ret) {
+        void DatamovementCalculator::finalizeStat(unsigned storage_id, RetVal& ret, bool profile) {
             auto storage_level = std::static_pointer_cast<model::BufferLevel>(
                 topology_.GetStorageLevel(storage_id)->Clone());
             tiling::CompoundMask mask = {};
@@ -217,21 +218,27 @@ namespace analysis
             assert(ret.p_tile_.unique());
             energy_ += rf_net->Energy() + du_net->Energy();
 
-            auto& data_movement = analysis_.data_movements_[storage_level->Name()];
-            auto& stat = storage_level->GetStats();
-            auto& specs = storage_level->GetSpecs();
-            data_movement["Accesses"] += storage_level->Accesses();
-            data_movement["SlowDown"] = std::max(data_movement["SlowDown"], slow_down);
-            data_movement["CapUtil"] = std::max(data_movement["CapUtil"], storage_level->CapacityUtilization());
-            data_movement["SpatialUtil"] = std::max(data_movement["SpatialUtil"], stat.utilized_instances.Max() / specs.instances.Get());
-            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; ++pv){
-                std::string suffix = "::" + problem::GetShape()->DataSpaceIDToName.at(pv);
-                data_movement["Read" + suffix] += (double)stat.reads.at(pv);
-                data_movement["Update" + suffix] += (double)stat.updates.at(pv);
-                data_movement["Fill" + suffix] += (double)stat.fills.at(pv);
-                data_movement["Read"] += (double)stat.reads.at(pv);
-                data_movement["Update"] += (double)stat.updates.at(pv);
-                data_movement["Fill"] += (double)stat.fills.at(pv);
+
+            if (profile) {
+                auto& data_movement = analysis_.data_movements_[storage_level->Name()];
+                auto& stat = storage_level->GetStats();
+                auto& specs = storage_level->GetSpecs();
+                data_movement["Energy"] += storage_level->Energy() + rf_net->Energy() + du_net->Energy();
+                data_movement["Accesses"] += storage_level->Accesses();
+                data_movement["SlowDown"] = std::max(data_movement["SlowDown"], slow_down);
+                data_movement["CapUtil"] = std::max(data_movement["CapUtil"], storage_level->CapacityUtilization());
+                data_movement["SpatialUtil"] = std::max(data_movement["SpatialUtil"], stat.utilized_instances.Max() / specs.instances.Get());
+                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; ++pv){
+                    std::string suffix = "::" + problem::GetShape()->DataSpaceIDToName.at(pv);
+                    data_movement["Read" + suffix] += (double)stat.reads.at(pv);
+                    data_movement["Update" + suffix] += (double)stat.updates.at(pv);
+                    data_movement["Fill" + suffix] += (double)stat.fills.at(pv);
+                    data_movement["Write" + suffix] += (double)stat.fills.at(pv) + (double)stat.updates.at(pv);
+                    data_movement["Read"] += (double)stat.reads.at(pv);
+                    data_movement["Update"] += (double)stat.updates.at(pv);
+                    data_movement["Fill"] += (double)stat.fills.at(pv);
+                    data_movement["Write"] += (double)stat.updates.at(pv) + (double)stat.fills.at(pv);
+                }
             }
 
             if (verbose_level > 1) {

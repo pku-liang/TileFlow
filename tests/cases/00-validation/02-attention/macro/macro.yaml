@@ -1,0 +1,20 @@
+macro: 
+  M: 512
+  N: 64
+  K: 64 
+  L: 512
+  
+  MO: 4
+  MM: 8
+  KO: 2
+  KM: 2
+  LO: 4
+  LM: 8
+
+
+  SX: 16
+  SY: 16   
+check:
+  mem: False
+output: doublegemm
+verbose: 1

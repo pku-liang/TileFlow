@@ -20,7 +20,18 @@ void tolower(std::string& str){
     std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) {return std::tolower(c);});
 }
 
-ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope){
+Node::Node(
+    Node::type_t t, 
+    config::CompoundConfigNode config):type_(t){
+    name_ = type2name_.at(type_);
+
+    if (config.exists("bypass"))
+        config.lookupArrayValue("bypass", bypassed_);
+    
+    config.lookupValue("profile", profile_);
+}
+
+ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope, config){
     std::string type_s = "sequential";
     config.lookupValue("type", type_s);
     tolower(type_s);
@@ -45,7 +56,7 @@ ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope){
 
 }   
 
-TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
+TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile, config) {
     std::string type_s = "temporal";
     config.lookupValue("type", type_s);
     tolower(type_s);
@@ -102,6 +113,13 @@ TileNode::TileNode(config::CompoundConfigNode config): Node(Node::Tile) {
     }
     
     name_ += type_ == Temporal? "::Temporal" : "::Spatial"; 
+}
+
+
+OpNode::OpNode(config::CompoundConfigNode config): Node(Node::Op, config) {
+    assert(config.lookupValue("name", op_name_));
+    p_workload = p_workloads_->get_workload(op_name_);
+    name_ += "::" + op_name_;
 }
 
 std::unordered_map<std::string, std::pair<int, int> > Node::ParseFactors(
@@ -193,12 +211,6 @@ void Node::ParseStorageLevel(config::CompoundConfigNode directive)
   storage_level_name_ = storage_level_name;
   storage_level_ = storage_level_id;
   name_ += "::" + storage_level_name_;
-}
-
-OpNode::OpNode(config::CompoundConfigNode config): Node(Node::Op) {
-    assert(config.lookupValue("name", op_name_));
-    p_workload = p_workloads_->get_workload(op_name_);
-    name_ += "::" + op_name_;
 }
 
 

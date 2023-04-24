@@ -38,10 +38,12 @@ void ShapeConstraintParser::visitOp(const OpNode* node) {
         int dim = problem::GetShape()->FactorizedDimensionNameToID.at(kv.first);
         int scale = workload_.GetFactorizedBound(dim);
         auto & expr = exprs_[dim];
-        assert(scale % expr.first == 0);
+        TILEFLOW_ASSERT(scale % expr.first == 0,  "At"; node->display("", false, nullptr, std::cerr); 
+            std::cerr <<  "cannot perfect divide for " << kv.first << ": " 
+            << scale << "v.s." << expr.first);
         if (!expr.second.size()) {
-            TILEFLOW_ASSERT(scale == expr.first, "At"; node->display("", false); 
-            std::cout <<  "mismatch for " << kv.first << ": " 
+            TILEFLOW_ASSERT(scale == expr.first, "At"; node->display("", false, nullptr, std::cerr); 
+            std::cerr <<  "mismatch for " << kv.first << ": " 
             << scale << "v.s." << expr.first);
         }
         else {
@@ -210,6 +212,9 @@ void Checker::add_access_pattern(
     }
     sc.push(common); sp.push(common);
 
+    while (!sc.empty() && sc.top()->get_type() != Node::Tile) sc.pop(); 
+    while (!sp.empty() && sp.top()->get_type() != Node::Tile) sp.pop(); 
+
     // while (!common.empty()) {
     //     auto node = common.top();
     //     common.pop();
@@ -223,6 +228,9 @@ void Checker::add_access_pattern(
         while (!sp.empty()) {
             auto node = sp.top();
             sp.pop();
+            if (node->is_bypassed(
+                problem::GetShape()->DataSpaceIDToName.at(producer_id)))
+                continue;
             if (problem::GetShape()->IsReadWriteDataSpace.at(producer_id)) {
                 node->get_active_tensors().read_tensors.insert(producer_id);
                 if (!sp.empty()) {
@@ -240,6 +248,9 @@ void Checker::add_access_pattern(
         while (!sc.empty()) {
             auto node = sc.top();
             sc.pop();
+            if (node->is_bypassed(
+                problem::GetShape()->DataSpaceIDToName.at(consumer_id)))
+                continue;
             node->get_active_tensors().read_tensors.insert(consumer_id);
             if (!sc.empty()) {
                 sc.top()->get_active_tensors().fill_tensors.insert(consumer_id);

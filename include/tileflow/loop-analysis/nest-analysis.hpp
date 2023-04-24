@@ -150,7 +150,7 @@ namespace TileFlow {
         
         void reset();
         void analyze();
-        void Print();
+        void Print(std::ostream& o = std::cout);
         void Report();
         void Export(const std::string& filename);
         std::uint64_t get_cycle() const {return cycle_;}
@@ -233,7 +233,7 @@ namespace TileFlow {
         double energy_;
         // const Node* curr_node_;
         RetVal computeDelta(const InputParam& input);
-        void finalizeStat(unsigned storage_id, RetVal& ret);
+        void finalizeStat(unsigned storage_id, RetVal& ret, bool profile);
         
         void visitTile(const TileNode*) override;
         void visitScope(const ScopeNode*) override;
@@ -338,9 +338,10 @@ namespace TileFlow {
         void visitScope(const ScopeNode*) override;
         void visitOp(const OpNode*) override;
         std::string prefix_;
+        std::ostream& o_;
     public: 
-        Displayer(NestAnalysis& analysis, const SymbolTable* symbol_table_ = nullptr)
-        : analysis_(analysis), symbol_table_(symbol_table_) {}
+        Displayer(NestAnalysis& analysis, const SymbolTable* symbol_table_ = nullptr, std::ostream& o = std::cout)
+        : analysis_(analysis), symbol_table_(symbol_table_), o_(o) {}
         void display() {analysis_.mapping_.root->accept(this);}
     };
 

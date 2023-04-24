@@ -81,14 +81,14 @@ namespace analysis
             pass.run(mapping_.root);
         }
 
-        void NestAnalysis::Print()
+        void NestAnalysis::Print(std::ostream& o)
         {
-            std::cout << "-----------------Nest Analysis----------------" << std::endl;
-            Displayer(*this, symb_table_).display();
-            std::cout << "Cycle: " << cycle_
+            o << "-----------------Nest Analysis----------------" << std::endl;
+            Displayer(*this, symb_table_, o).display();
+            o << "Cycle: " << cycle_
                     << ", Energy: " << energy_
                      << std::endl;
-            std::cout << "--------------END Nest Analysis---------------" << std::endl;
+            o << "--------------END Nest Analysis---------------" << std::endl;
         }
 
         void NestAnalysis::Report() {
@@ -117,50 +117,50 @@ namespace analysis
         {
             auto &configs_ = analysis_.configs;
             if (verbose_level > 1) {
-                std::cout << prefix_ << "Tile:" << std::endl;
+                o_ << prefix_ << "Tile:" << std::endl;
                 if (configs_.count(node))
                 {
                     auto &config = configs_[node];
-                    std::cout << prefix_ << "storage:" << node->get_storage_name();
-                    std::cout << ", fanout:" << config.fanout_x << "," << config.fanout_y << std::endl;
-                    std::cout << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
-                    std::cout << prefix_ << "l-fanout" << config.logical_x << "," << config.logical_y << std::endl;
-                    std::cout << prefix_ << "repFactor:" << config.replication_factor << std::endl;
-                    std::cout << prefix_ << "strides:" << std::endl;
+                    o_ << prefix_ << "storage:" << node->get_storage_name();
+                    o_ << ", fanout:" << config.fanout_x << "," << config.fanout_y << std::endl;
+                    o_ << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
+                    o_ << prefix_ << "l-fanout" << config.logical_x << "," << config.logical_y << std::endl;
+                    o_ << prefix_ << "repFactor:" << config.replication_factor << std::endl;
+                    o_ << prefix_ << "strides:" << std::endl;
                     for (unsigned i = 0; i < config.loop_nest.loops.size(); i++) {
-                        std::cout << prefix_ << config.loop_nest.loops[i].PrintCompact() << ":" 
+                        o_ << prefix_ << config.loop_nest.loops[i].PrintCompact() << ":" 
                             << config.vector_strides_[i] << std::endl;
                     }
                     for (auto& kv: config.stats_) {
-                        std::cout << prefix_ << "<";
-                        for (auto&x: kv.first) std::cout << x << ",";
-                        std::cout << "> max_size, link_transfer, access_stats: " << std::endl;
+                        o_ << prefix_ << "<";
+                        for (auto&x: kv.first) o_ << x << ",";
+                        o_ << "> max_size, link_transfer, access_stats: " << std::endl;
                         for (int pv = 0; pv < (int) problem::GetShape()->NumDataSpaces; 
                             pv++) {
-                            std::cout << prefix_ 
+                            o_ << prefix_ 
                                 << problem::GetShape()->DataSpaceIDToName.at(pv) << ":" 
                                 << kv.second.max_size_[pv] << "," 
                                 << kv.second.link_transfer_[pv] << ","
                                 << kv.second.access_stat_[pv];
                         }
-                        std::cout << std::endl;
+                        o_ << std::endl;
                     }
                 }
                 if (analysis_.tiles_.count(node)) {
                     auto& info_ = analysis_.tiles_.at(node).data_movement_info;
-                    std::cout << info_;
-                    // std::cout << prefix_ << "size, read, fill, updates:" << std::endl; 
+                    o_ << info_;
+                    // o_ << prefix_ << "size, read, fill, updates:" << std::endl; 
                     // for (int pv = 0; pv < (int)problem::GetShape()->NumDataSpaces;   
                     //     pv ++) {
                     //     auto& info = info_[pv];
-                    //     std::cout << prefix_ << "  " << problem::GetShape()->DataSpaceIDToName.at(pv)
+                    //     o_ << prefix_ << "  " << problem::GetShape()->DataSpaceIDToName.at(pv)
                     //         << ": " << info.size << "," << info.reads << "," << info.fills
                     //         << "," << info.updates << std::endl;
                     // }
                 }
             }
 
-            node->display(prefix_, false, symbol_table_);
+            node->display(prefix_, false, symbol_table_, o_);
             auto old_prefix = prefix_;
             for (int i = 0; i < (int)node->n_level(); ++i)
                 prefix_ += "   ";
@@ -171,35 +171,37 @@ namespace analysis
 
         void Displayer::visitScope(const ScopeNode *node)
         {
-            node->display(prefix_, false, symbol_table_);
+            node->display(prefix_, false, symbol_table_, o_);
             std::string old_prefix = prefix_;
-            std::cout << prefix_ << "{" << std::endl;
+            o_ << prefix_ << "{" << std::endl;
             prefix_ += "   ";
             for (auto child : node->get_children())
                 const_cast<Node *>(child)->accept(this);
             prefix_ = old_prefix;
-            std::cout << prefix_ << "}" << std::endl;
+            o_ << prefix_ << "}" << std::endl;
         }
         void Displayer::visitOp(const OpNode *node)
         {
-            node->display(prefix_, false, symbol_table_);
-            if (verbose_level > 1) {
-                std::cout << prefix_ << "ComputeInfo:";
-                auto& config = analysis_.configs[node];
-                auto& info = config.stats_;
-                for (auto& kv: info) {
-                    std::cout << "<";
-                    for (auto& idx: kv.first) std::cout << idx << ",";
-                    std::cout << ">:";
-                    std::cout << kv.second.compute_info_.accesses << "X" 
-                        << kv.second.compute_info_.replication_factor << ",";
-                }
+            node->display(prefix_, false, symbol_table_, o_);
+            if (verbose_level && analysis_.tiles_.count(node)) {
                 auto& compute_info = analysis_.tiles_.at(node).compute_info;
-                std::cout << std::endl;
-                std::cout << prefix_<< "repFactor:" << compute_info.replication_factor << std::endl;
-                std::cout << prefix_<< "accesses:" << compute_info.accesses << std::endl;
-                std::cout << prefix_<< "expanison:" << compute_info.max_x_expansion 
+                o_ << prefix_<< "repFactor:" << compute_info.replication_factor << std::endl;
+                o_ << prefix_<< "accesses:" << compute_info.accesses << std::endl;
+                o_ << prefix_<< "expanison:" << compute_info.max_x_expansion 
                     << "," << compute_info.max_y_expansion << std::endl;
+                if (verbose_level > 1) {
+                    o_ << prefix_ << "ComputeInfo:";
+                    auto& config = analysis_.configs[node];
+                    auto& info = config.stats_;
+                    for (auto& kv: info) {
+                        o_ << "<";
+                        for (auto& idx: kv.first) o_ << idx << ",";
+                        o_ << ">:";
+                        o_ << kv.second.compute_info_.accesses << "X" 
+                            << kv.second.compute_info_.replication_factor << ",";
+                    }
+                    o_ << std::endl;
+                }
             }
         }
 
@@ -607,8 +609,7 @@ namespace analysis
             auto &update_tensors = input_.curr_node_->get_active_tensors().update_tensors;
 
             for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces; pv++) {
-                if (find(read_tensors.begin(), read_tensors.end(), pv) == read_tensors.end() 
-                && find(update_tensors.begin(), update_tensors.end(), pv) == update_tensors.end()) 
+                if (!read_tensors.count(pv) && !update_tensors.count(pv)) 
                     point_set.GetDataSpace(pv).Reset();
             }
             
@@ -662,7 +663,11 @@ namespace analysis
                 trip_counts.push_back(trip_counts.back() * loop_counts.back());
             }
             
-            ;
+            
+            auto active_tensors = input_.curr_node_->get_active_tensors().read_tensors;
+            auto update_tensors = input_.curr_node_->get_active_tensors().update_tensors;
+            active_tensors.insert(update_tensors.begin(), update_tensors.end());
+            
             for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces;
                 ++pv) {
                 access_stat[pv].clear();        
@@ -678,8 +683,7 @@ namespace analysis
                 // std::cout << input;
                 // std::cout << ret_val; 
                 // std::cout << "</" << input_.curr_node_->get_storage_name() << "::init>" << std::endl;
-                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces;
-                    ++pv){
+                for (auto pv: active_tensors){
                     access_stat[pv].Accumulate(ret_val.access_stat_.at(pv));
                 }
                 cycle += ret_val.cycle_;
@@ -719,17 +723,14 @@ namespace analysis
                 // std::cout << "</" << input_.curr_node_->get_storage_name() << "::"
                 //      << problem::GetShape()->FlattenedDimensionIDToName.at(nest_state_[i].descriptor.dimension)
                 //     << ">" << std::endl;
-                for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces;
-                    ++pv){
+                for (auto pv: active_tensors){
                     access_stat[pv].Accumulate(ret_val.access_stat_.at(pv));
                 }
                 cycle += ret_val.cycle_;
             }
 
-
             auto & acc_access_stat = config_.stats_[input_.space_stamp_].access_stat_;
-            for (unsigned pv = 0; pv < problem::GetShape()->NumDataSpaces;  
-                ++pv){
+            for (auto pv: active_tensors){
                 acc_access_stat[pv].Accumulate(access_stat.at(pv));
             }
 

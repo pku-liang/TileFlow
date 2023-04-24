@@ -8,8 +8,8 @@ architecture:
     - name: MainMemory
       class: DRAM 
       attributes:
-        width: 256 
-        block-size: 32
+        depth: 1
+        block-size: 2048
         word-bits: 8
       
     subtree:
@@ -22,8 +22,8 @@ architecture:
           depth: 112 
           width: 16 
           word-bits: 8
-          read_bandwidth: 2
-          write_bandwidth: 2
+          read_bandwidth: 1
+          write_bandwidth: 1
 
       - name: mac 
         class: intmac 

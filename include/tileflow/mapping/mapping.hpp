@@ -54,6 +54,8 @@ protected:
     std::vector<const Node*> children_;
     std::string storage_level_name_;
     unsigned storage_level_ = unsigned(-1);
+    std::vector<std::string> bypassed_;
+    bool profile_ = true;
 
     mutable ActiveTensor active_tensors_;
 
@@ -63,7 +65,10 @@ protected:
     void display_active_tensors(std::string prefix, std::ostream& o = std::cout) const;
 
 public: 
-    Node(type_t t_): type_(t_), name_(type2name_.at(t_)) {}
+    bool is_bypassed(const std::string & tensor) const {
+        return std::find(bypassed_.begin(), bypassed_.end(), tensor) != bypassed_.end();}
+    bool is_profile() const {return profile_;}
+    Node(type_t, config::CompoundConfigNode);
     
     unsigned get_storage_level() const {return storage_level_;}
     std::string get_storage_name() const {return storage_level_name_;}
@@ -133,7 +138,7 @@ private:
     // std::pair<int, int> represent the <end, residual end>
     std::vector<loop::TileFlow::Descriptor> loopnests_;
     TileNode::type_t type_;
-    bool multicast_enabled_ = true; 
+    bool multicast_enabled_ = true;
 
 public:
     TileNode(config::CompoundConfigNode config);

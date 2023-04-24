@@ -53,14 +53,18 @@ void Mapper::report() {
 
 void Mapper::report_mapping(std::ostream& o){
     o << "***Optimal Mapping:" << std::endl;
-    mapping_.root->display("", true, &optimum_, o);
+    analysis::TileFlow::NestAnalysis analysis(workloads_, mapping_, arch_specs_, topology_);
+    analysis.set_symbol_table(&optimum_);
+    analysis.analyze();
+    analysis.Print(o);
+    // mapping_.root->display("", true, &optimum_, o);
 }
 
 void Mapper::report_csv(std::ostream& o) {
     analysis::TileFlow::NestAnalysis analysis(workloads_, mapping_, arch_specs_, topology_);
     analysis.set_symbol_table(&optimum_);
     analysis.analyze();
-    o << ",value" << std::endl;
+    o << "metric,value" << std::endl;
     o << "Cycle," << analysis.get_cycle() << std::endl;
     o << "Energy," << analysis.get_energy() << std::endl;
     analysis.get_data_movements().report(o);
