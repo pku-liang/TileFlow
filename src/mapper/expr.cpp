@@ -225,7 +225,7 @@ bool SymbolTable::fail_check(const std::vector<Constraint>& constraints_) {
     for (auto& cons: constraints_) {
         if (cons.type_ == Constraint::MEM || cons.type_ == Constraint::SPATIAL) {
             if (!cons.expr->eval(*this)){
-                if (verbose_level)
+                if (verbose_level > 1)
                     TILEFLOW_LOG("Search end because of cond check failure: " << cons.msg);
                 return true;
             } 
@@ -236,7 +236,7 @@ bool SymbolTable::fail_check(const std::vector<Constraint>& constraints_) {
             auto r = cond->right_->eval(*this);
             auto l = cond->left_->eval(*this);
             if ((vars.empty() && l != r) || (!vars.empty() && r % l != 0)) {
-                if (verbose_level)
+                if (verbose_level > 1)
                     TILEFLOW_LOG("Search end because of cond check failure: " << cons.msg);
                 return true;
             }

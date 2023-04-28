@@ -205,24 +205,24 @@ namespace analysis
                 ret.cycle_, break_on_failure);
             assert(storage_level->Cycles() >= ret.cycle_);
 
-            double slow_down = storage_level->Cycles() / (0.0 + ret.cycle_);
-            storage_level->FinalizeBufferEnergy();
             ret.cycle_ = storage_level->Cycles();
-            energy_ += storage_level->Energy();
-
-            auto connection = topology_.connection_map_.at(storage_id);
-            auto rf_net = connection.read_fill_network->Clone();
-            rf_net->Evaluate(*ret.p_tile_, break_on_failure);
-            auto du_net = connection.drain_update_network->Clone();
-            du_net->Evaluate(*ret.p_tile_, break_on_failure);
-            assert(ret.p_tile_.unique());
-            energy_ += rf_net->Energy() + du_net->Energy();
-
 
             if (profile) {
+                double slow_down = storage_level->Cycles() / (0.0 + ret.cycle_);
+                storage_level->FinalizeBufferEnergy();
+                energy_ += storage_level->Energy();
+
+                auto connection = topology_.connection_map_.at(storage_id);
+                auto rf_net = connection.read_fill_network->Clone();
+                rf_net->Evaluate(*ret.p_tile_, break_on_failure);
+                auto du_net = connection.drain_update_network->Clone();
+                du_net->Evaluate(*ret.p_tile_, break_on_failure);
+                assert(ret.p_tile_.unique());
+                energy_ += rf_net->Energy() + du_net->Energy();
                 auto& data_movement = analysis_.data_movements_[storage_level->Name()];
                 auto& stat = storage_level->GetStats();
                 auto& specs = storage_level->GetSpecs();
+                // double all_accesses = 0;
                 data_movement["Energy"] += storage_level->Energy() + rf_net->Energy() + du_net->Energy();
                 data_movement["Accesses"] += storage_level->Accesses();
                 data_movement["SlowDown"] = std::max(data_movement["SlowDown"], slow_down);
@@ -238,7 +238,10 @@ namespace analysis
                     data_movement["Update"] += (double)stat.updates.at(pv);
                     data_movement["Fill"] += (double)stat.fills.at(pv);
                     data_movement["Write"] += (double)stat.updates.at(pv) + (double)stat.fills.at(pv);
+                    // all_accesses += (double)stat.reads.at(pv) + (double)stat.updates.at(pv) + (double)stat.fills.at(pv);
                 }
+                // auto param = (storage_level->Energy() + rf_net->Energy() + du_net->Energy()) / all_accesses;
+                // std::cout << "Buffer::" << storage_level->Name() << ", " << param << std::endl;
             }
 
             if (verbose_level > 1) {

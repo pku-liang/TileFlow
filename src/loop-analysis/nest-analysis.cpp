@@ -116,34 +116,41 @@ namespace analysis
         void Displayer::visitTile(const TileNode *node)
         {
             auto &configs_ = analysis_.configs;
-            if (verbose_level > 1) {
-                o_ << prefix_ << "Tile:" << std::endl;
+            if (verbose_level) {
+                o_ << prefix_ << node->get_name() << "," << std::endl;
                 if (configs_.count(node))
                 {
                     auto &config = configs_[node];
-                    o_ << prefix_ << "storage:" << node->get_storage_name();
-                    o_ << ", fanout:" << config.fanout_x << "," << config.fanout_y << std::endl;
-                    o_ << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
-                    o_ << prefix_ << "l-fanout" << config.logical_x << "," << config.logical_y << std::endl;
-                    o_ << prefix_ << "repFactor:" << config.replication_factor << std::endl;
-                    o_ << prefix_ << "strides:" << std::endl;
-                    for (unsigned i = 0; i < config.loop_nest.loops.size(); i++) {
-                        o_ << prefix_ << config.loop_nest.loops[i].PrintCompact() << ":" 
-                            << config.vector_strides_[i] << std::endl;
+                    o_ << prefix_ << "strides,low,high:";
+                    for (unsigned dim = 0; dim < problem::GetShape()->NumFactorizedDimensions; dim++){
+                        o_ << problem::GetShape()->FactorizedDimensionIDToName.at(dim);
                     }
-                    for (auto& kv: config.stats_) {
-                        o_ << prefix_ << "<";
-                        for (auto&x: kv.first) o_ << x << ",";
-                        o_ << "> max_size, link_transfer, access_stats: " << std::endl;
-                        for (int pv = 0; pv < (int) problem::GetShape()->NumDataSpaces; 
-                            pv++) {
-                            o_ << prefix_ 
-                                << problem::GetShape()->DataSpaceIDToName.at(pv) << ":" 
-                                << kv.second.max_size_[pv] << "," 
-                                << kv.second.link_transfer_[pv] << ","
-                                << kv.second.access_stat_[pv];
+                    o_ << config.vector_strides_.front() << "," << config.mold_low_.front() << "," << config.mold_high_.front() << std::endl;
+                    if (verbose_level > 1) {
+                        o_ << prefix_ << "storage:" << node->get_storage_name();
+                        o_ << ", fanout:" << config.fanout_x << "," << config.fanout_y << std::endl;
+                        o_ << prefix_ << "offset:" << config.spatial_offset_x << "," << config.spatial_offset_y << ",";
+                        o_ << prefix_ << "l-fanout" << config.logical_x << "," << config.logical_y << std::endl;
+                        o_ << prefix_ << "repFactor:" << config.replication_factor << std::endl;
+                        o_ << prefix_ << "strides:" << std::endl;
+                        for (unsigned i = 0; i < config.loop_nest.loops.size(); i++) {
+                            o_ << prefix_ << config.loop_nest.loops[i].PrintCompact() << ":" 
+                                << config.vector_strides_[i] << std::endl;
                         }
-                        o_ << std::endl;
+                        for (auto& kv: config.stats_) {
+                            o_ << prefix_ << "<";
+                            for (auto&x: kv.first) o_ << x << ",";
+                            o_ << "> max_size, link_transfer, access_stats: " << std::endl;
+                            for (int pv = 0; pv < (int) problem::GetShape()->NumDataSpaces; 
+                                pv++) {
+                                o_ << prefix_ 
+                                    << problem::GetShape()->DataSpaceIDToName.at(pv) << ":" 
+                                    << kv.second.max_size_[pv] << "," 
+                                    << kv.second.link_transfer_[pv] << ","
+                                    << kv.second.access_stat_[pv];
+                            }
+                            o_ << std::endl;
+                        }
                     }
                 }
                 if (analysis_.tiles_.count(node)) {

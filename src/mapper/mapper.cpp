@@ -8,6 +8,17 @@ namespace TileFlow {
 
 namespace mapper {
 
+void Algorithm::report_csv(std::ostream& o) const {
+    o << "index,time,iter,reward,value,best_reward,best_value,node" << std::endl;
+    int idx = 0;
+    for (auto& log: logs_) {
+        o << idx++ << "," << log.time << "," << log.iter 
+        << "," << log.reward.reward << "," << log.reward.value
+        << "," << log.best_reward.reward << "," << log.best_reward.value
+        << "," << log.node << std::endl;
+    }
+}
+
 const SymbolTable* Mapper::search() {
     std::string obj = obj_ == Objective::CYCLE? "cycle" : "energy";
     TILEFLOW_LOG("Optimize " << obj << "...");
@@ -17,8 +28,8 @@ const SymbolTable* Mapper::search() {
         return &optimum_;
     }
     Env env(constraints_, global_symbol_table_, analyzer, obj_);
-    MCTS mcts(&env, timeout_);
-    mcts.search();
+    alg_->set_env(&env);
+    alg_->search();
     auto ret = env.get_best_symbol_table();
     TILEFLOW_ASSERT(ret, "no candidate found");
     TILEFLOW_LOG("best factors: "; ret->show_brief(std::cout); std::cerr);
@@ -41,6 +52,11 @@ void Mapper::dump(const std::string & filename){
     file.open(prefix + ".mapping.txt");
     report_mapping(file);
     file.close();
+
+    file.open(prefix + ".tuning.csv");
+    alg_->report_csv(file);
+    file.close(); 
+
     TILEFLOW_LOG("mapping written into " << prefix << ".mapping.txt");
 }
 
@@ -94,14 +110,13 @@ Action Env::step(bool random) {
     return act;
 }
 
-double Env::get_reward(){
+Reward Env::calculate_reward(){
     assert(terminated_ && curr_state_->is_terminated());
-    double reward;
-    if (curr_state_->n_visit > 0) {
-        reward = curr_state_->ave_reward;
-    }
+    auto& reward = curr_state_->remembered_reward;
+    if (!(reward > 0)) {
+    } 
     else if (curr_state_->is_error_out()) {
-        reward = punish_;
+        reward = {punish_, 0.0};
     }
     else 
     {
@@ -114,20 +129,21 @@ double Env::get_reward(){
             analyzer_.Print();
         }
         analyzer_.analyze();
-        double value; 
-        if (obj_ == Objective::CYCLE) value = (double)(analyzer_.get_cycle());
-        else if (obj_ == Objective::ENERGY) value = (double)(analyzer_.get_energy());
-        reward = -std::log10(value);
+        if (obj_ == Objective::CYCLE) reward.value = (double)(analyzer_.get_cycle());
+        else if (obj_ == Objective::ENERGY) reward.value = (double)(analyzer_.get_energy());
+        reward.reward = -std::log10(reward.value);
+        // std::cout << "analyzed reward:" << reward.reward << std::endl;
         
         if (reward > best_reward_) {
             TILEFLOW_LOG("Update best "; if (verbose_level) curr_state_->symbol_table_.show_brief(std::cerr); std::cerr 
-                    << " value: " <<  value);
+                    << " value: " <<  reward.value);
             best_reward_ = reward;
             best_symbol_table_ = &curr_state_->symbol_table_;
         }
+        if (punish_ + 2 > reward.reward) 
+            punish_ = reward.reward - 2;
     }
-    if (punish_ + 2 > reward) 
-        punish_ = reward - 2;
+    // std::cout << "calculated reward:" << reward.reward << std::endl;
     return reward;
 }
 
@@ -136,7 +152,7 @@ State* MCTS::select_state() {
     env_->reset();
     // std::cout << *env_->get_curr_state(); 
     while (!env_->is_terminated() && !env_->is_expanded()) {
-        env_->step();
+        env_->step(random_);
         // Action act = env_->step();
         // std::cout << "\tfix to " << act << std::endl;
         // std::cout << *env_->get_curr_state(); 
@@ -151,48 +167,58 @@ State* MCTS::select_state() {
     return curr_state;
 }
 
-double MCTS::rollout(State* state) {
-    double ave_reward = 0.0; 
-    for (int i = 0; i < n_rollout; ++i) {
+Reward MCTS::rollout(State* state) {
+    // Reward ave_reward = 0.0; 
+    Reward max_reward = -100; 
+    for (unsigned i = 0; i < n_rollout; ++i) {
         env_->reset(state);
         while(!env_->is_terminated()) {
             env_->step(true);
         }
-        ave_reward += (env_->get_reward() - ave_reward) / (i+1);
+        // ave_reward += (env_->calculate_reward() - ave_reward) / (i+1);
+        auto reward = env_->calculate_reward();
+        if (reward > max_reward) 
+            max_reward = reward;
     }
-    return ave_reward;
+    // std::cout << "roll out reward: " << max_reward << std::endl;
+    return max_reward;
 }
 
-void MCTS::back_prop(State* state, double reward){
+void MCTS::back_prop(State* state, Reward reward){
     while (state) {
         state->n_visit ++;
-        state->ave_reward += (0.0 + reward - state->ave_reward) / state->n_visit;
+        state->ave_reward += (reward - state->ave_reward) / state->n_visit;
         state = state->parent;
     }
 }
 
 void MCTS::search() {
+    assert(env_!=nullptr);
+    n_unexplored = env_->get_curr_state()->candidate_factors_.size();
     start_timer();
-    for (int i = 0; i < n_iteration; i++ ) {
+    for (iter_ = 0; iter_ < n_iteration; iter_++ ) {
         auto state = select_state();
-        double reward = rollout(state);
+        Reward reward = rollout(state);
         back_prop(state, reward); 
         if (!n_unexplored) {
-            if (verbose_level) 
-                std::cout << "MCTS: finished searching after " << i + 1 << " rounds" << std::endl;
+            TILEFLOW_LOG("MCTS: early exit for exhausting the search space after " << iter_ + 1 << " rounds.");
             return;
         }
         if (get_elapsed_time() > timeout_) {
             TILEFLOW_LOG("MCTS exit becuase of timeout.");
             return;
         }
+        std::stringstream s;
+        state->Print(s);
+        logs_.push_back({get_elapsed_time(), iter_, state->ave_reward, env_->get_reward(), s.str()});
     }
+    
 }
 
 std::pair<Action, bool> State::select_action(bool random) {
     if (random) {
         auto act = candidate_factors_[std::rand() % candidate_factors_.size()];
-        return {act, children_[act] == nullptr};
+        return {act, children_[act] == nullptr || children_[act]->n_visit == 0};
     }
 
     double score = -1e9;
@@ -203,10 +229,10 @@ std::pair<Action, bool> State::select_action(bool random) {
         if (!child || child->n_visit == 0) {
             return {factor, true};            
         }
-        double cur_score = child->ave_reward + C * std::sqrt(std::log(n_visit) / child->n_visit);
+        auto cur_score = child->ave_reward + C * std::sqrt(std::log(n_visit) / child->n_visit);
         if (cur_score > score) {
             act = factor;
-            score = cur_score;
+            score = cur_score.reward;
         } 
     }
     return {act, false};
@@ -221,6 +247,7 @@ State* State::take_action(const Action& action,
         table.fix_and_update(variable_index, action, constraints_);
         child = new State(std::move(table), constraints_);
         child->parent = this;
+        child->last_action = action;
     }
     return child;
 }
@@ -254,6 +281,22 @@ void State::init_factors(const std::vector<Constraint>& constraints){
     for (auto& factor: entry.candidates_) {
         candidate_factors_.push_back(factor);
         children_[factor] = nullptr;
+    }
+}
+
+std::ostream& operator<<(std::ostream& o, const Reward& r) {
+    o << r.reward << "," << r.value;
+    return o;
+}
+
+
+void State::Print(std::ostream& o) {
+    auto node = this;
+    while (node && node->parent) {
+        auto& entry = node->symbol_table_.lookup(node->parent->variable_index);
+        assert(entry.fixed_);
+        o << entry.name_ << ":" << entry.value_ << "-";
+        node = node->parent;
     }
 }
 

@@ -52,8 +52,8 @@ protected:
     std::string name_;
     mutable const Node* parent_ = nullptr;
     std::vector<const Node*> children_;
-    std::string storage_level_name_;
-    unsigned storage_level_ = unsigned(-1);
+    mutable std::string storage_level_name_;
+    mutable unsigned storage_level_ = unsigned(-1);
     std::vector<std::string> bypassed_;
     bool profile_ = true;
 
@@ -71,6 +71,8 @@ public:
     Node(type_t, config::CompoundConfigNode);
     
     unsigned get_storage_level() const {return storage_level_;}
+    void set_storage_level(unsigned storage_level, const std::string& storage_name) const {
+        storage_level_ = storage_level; storage_level_name_ = storage_name;}
     std::string get_storage_name() const {return storage_level_name_;}
     std::string get_name() const {return name_;}
     type_t get_type() const {return type_;}

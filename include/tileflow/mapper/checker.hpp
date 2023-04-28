@@ -18,10 +18,12 @@ namespace TileFlow {
         std::vector<std::pair<int, std::vector<std::shared_ptr<Expr> > > > 
             exprs_;
         const problem::Workload& workload_;
+        bool allow_mismatched_;
+        
         std::vector<Constraint > constraints;
     public:
-        ShapeConstraintParser(const problem::Workload& workload):
-            workload_(workload){}
+        ShapeConstraintParser(const problem::Workload& workload, bool allow_mismatched = false):
+            workload_(workload), allow_mismatched_(allow_mismatched){}
         std::vector<Constraint > parse(const Node*root);
 
     };
@@ -86,6 +88,7 @@ namespace TileFlow {
         const model::Topology& topology_;
         bool enable_mem_check_;
         bool enable_spatial_check_;
+        bool enable_loopcount_check_;
 
         std::vector<Constraint > constraints;
         void swap_spatial_scope();
@@ -105,9 +108,12 @@ namespace TileFlow {
             const mapping::TileFlow::Mapping& mapping,
             const model::Topology& topology,
             bool enable_mem_check_ = true,
-            bool enable_spatial_check_ = true)
+            bool enable_spatial_check_ = true,
+            bool enable_loopcount_check_ = true)
             : workloads_(workloads), mapping_(mapping), topology_(topology), 
-            enable_mem_check_(enable_mem_check_), enable_spatial_check_(enable_spatial_check_){}
+            enable_mem_check_(enable_mem_check_), 
+            enable_spatial_check_(enable_spatial_check_),
+            enable_loopcount_check_(enable_loopcount_check_){}
         const std::vector<Constraint>& get_constraints() const {return constraints;}
         void check(const SymbolTable* symbol_table = nullptr);
         void display(const SymbolTable* symbol_table = nullptr);

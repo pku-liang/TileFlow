@@ -42,9 +42,16 @@ void ShapeConstraintParser::visitOp(const OpNode* node) {
             std::cerr <<  "cannot perfect divide for " << kv.first << ": " 
             << scale << "v.s." << expr.first);
         if (!expr.second.size()) {
-            TILEFLOW_ASSERT(scale == expr.first, "At"; node->display("", false, nullptr, std::cerr); 
-            std::cerr <<  "mismatch for " << kv.first << ": " 
-            << scale << "v.s." << expr.first);
+            if (allow_mismatched_) {
+                TILEFLOW_COND_WARNING(scale == expr.first, "At"; node->display("", false, nullptr, std::cerr); 
+                std::cerr <<  "mismatch for " << kv.first << ": " 
+                << scale << "v.s." << expr.first);
+            }
+            else {
+                TILEFLOW_ASSERT(scale == expr.first, "At"; node->display("", false, nullptr, std::cerr); 
+                std::cerr <<  "mismatch for " << kv.first << ": " 
+                << scale << "v.s." << expr.first);
+            }
         }
         else {
             constraints.push_back({
@@ -99,8 +106,19 @@ void SpatialScopeSwapper::visitScope(const ScopeNode* node){
             delete parent_;
         }
     }
-    for (auto child: node->get_children())
+
+    unsigned storage_level = node->get_storage_level();
+    std::string storage_level_name = node->get_storage_name();
+
+    for (auto child: node->get_children()) {
         child->accept(this);
+        if (child->get_storage_level() > storage_level){
+            storage_level = child->get_storage_level();
+            storage_level_name = child->get_storage_name();
+        }
+    }
+    
+    node->set_storage_level(storage_level, storage_level_name);
 }
 
 void Checker::parse_constraints() {
@@ -285,7 +303,7 @@ void Checker::sanity_check() {
 }
 
 void Checker::get_shape_constraints() {
-    ShapeConstraintParser parser(workloads_.get_workload());
+    ShapeConstraintParser parser(workloads_.get_workload(), !enable_loopcount_check_);
     auto cons = parser.parse(mapping_.root);
     constraints.insert(constraints.end(), cons.begin(), cons.end());
 }

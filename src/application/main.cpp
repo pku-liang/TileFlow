@@ -19,6 +19,24 @@ extern bool gTerminateEval;
 //                    MAIN                    //
 //--------------------------------------------//
 
+void show_energy(
+  const model::TileFlow::Topology& topology,
+  std::ostream& o = std::cout) {
+  auto arith = topology.GetArithmeticLevel();
+  o << "==========AccessEnergy===========" << std::endl;
+  o << "metric, energy" << std::endl;
+  o << "Arith::energy_per_op," 
+    << arith->GetSpecs().op_energy_map.at("random_compute") << std::endl;
+  for (unsigned i = 0; i < topology.NumStorageLevels(); i++){
+    auto buffer = topology.GetStorageLevel(i);
+    auto& specs = buffer->GetSpecs();
+    o << "Buffer::" << buffer->Name() << "::energy_per_op::read," << specs.op_energy_map.at("random_read") << std::endl;
+    o << "Buffer::" << buffer->Name() << "::energy_per_op::update," << specs.op_energy_map.at("random_update") << std::endl;
+    o << "Buffer::" << buffer->Name() << "::energy_per_op::fill," << specs.op_energy_map.at("random_fill") << std::endl;
+  }
+  o << "========End AccessEnergy=========" << std::endl;
+}
+
 int main(int argc, char* argv[])
 {
   assert(argc >= 2);
@@ -92,6 +110,8 @@ int main(int argc, char* argv[])
 
   std::cout << "Begin Spec..." << std::endl; 
   topology.Spec(arch_specs_.topology);
+  if (verbose_level)
+    show_energy(topology,std::cout);
 
   auto mapping = 
     mapping::TileFlow::ParseAndConstruct(root.lookup("mapping"), arch_specs_, workloads);
@@ -101,13 +121,16 @@ int main(int argc, char* argv[])
 
   bool enable_mem_check_ = true;
   bool enable_spatial_check_ = true;
+  bool enable_loopcount_check_ = true;
   if (root.exists("check")) {
     auto checknode = root.lookup("check");
     checknode.lookupValue("mem", enable_mem_check_);
     checknode.lookupValue("spatial", enable_spatial_check_);
+    checknode.lookupValue("loopcount", enable_loopcount_check_);
   }
 
-  TileFlow::Checker checker(workloads, mapping, topology, enable_mem_check_, enable_spatial_check_);
+  TileFlow::Checker checker(workloads, mapping, topology
+  , enable_mem_check_, enable_spatial_check_, enable_loopcount_check_);
   
   checker.check();
 
@@ -116,7 +139,7 @@ int main(int argc, char* argv[])
 
   TileFlow::mapper::Objective obj = TileFlow::mapper::CYCLE;
   unsigned timeout = 600;
-
+  std::string search_alg = "random";
   if (root.exists("tileflow-mapper")) {
     auto mapper = root.lookup("tileflow-mapper");
     std::string objective;
@@ -125,9 +148,10 @@ int main(int argc, char* argv[])
       else if (objective == "energy") obj = TileFlow::mapper::ENERGY;
     }
     mapper.lookupValue("timeout", timeout);
+    mapper.lookupValue("alg", search_alg);
   }
 
-  TileFlow::mapper::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, obj, timeout);
+  TileFlow::mapper::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, obj, timeout, search_alg);
 
   auto result = mapper.search();
   assert(result);
@@ -143,23 +167,6 @@ int main(int argc, char* argv[])
     root.lookupValue("output", filename);
     mapper.dump(filename);
   }
-
-  /*
-  analysis::TileFlow::NestAnalysis analysis(workloads, mapping, arch_specs_, topology_);
-  analysis.analyze();
-  
-  if (TileFlow::verbose_level)
-    analysis.Print();
-  
-  analysis.Report();
-
-  if (root.exists("output"))  {
-    std::string filename;
-    root.lookupValue("output", filename);
-    analysis.Export(filename);
-  }
-
-  */
   
   return 0;
 }
