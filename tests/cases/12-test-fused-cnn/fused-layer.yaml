@@ -1,0 +1,183 @@
+output: fused-layer
+verbose: 1
+problem:
+  io:
+    ins: I X Y
+    outs: D
+  dimensions: [B,H,W,C,L,K,R,S,U,V]
+  instance:
+    B: 1
+    H: 112
+    W: 112
+    C: 64
+    L: 192
+    K: 128
+    R: 3
+    S: 3
+    U: 3
+    V: 3
+
+  ops:
+  - name: ProduceA
+    dimensions: [L,C,R,S,B,H,W,U,V]
+    data-spaces:
+    - name: A
+      projection:
+        - [[B]]
+        - [[L]]
+        - [[H], [U]]
+        - [[W], [V]]
+      read-write: True
+    - name: X
+      projection:
+        - [[L]]
+        - [[C]]
+        - [[R]]
+        - [[S]]
+    - name: I
+      projection:
+        - [[B]]
+        - [[C]]
+        - [[H],[R]]
+        - [[W],[S]]
+    ins: X, I
+    out: A
+
+  - name: ProduceD
+    dimensions: [K,L,U,V,B,H,W]
+    data-spaces:
+    - name: D
+      projection:
+        - [[B]]
+        - [[K]]
+        - [[H]]
+        - [[W]]
+      read-write: True
+    - name: Y
+      projection:
+        - [[K]]
+        - [[L]]
+        - [[U]]
+        - [[V]]
+    - name: A
+      projection:
+        - [[B]]
+        - [[L]]
+        - [[H],[U]]
+        - [[W],[V]]
+    ins: Y, A
+    out: D
+
+architecture:
+  version: 0.2
+  subtree:
+  - name: System
+    attributes:
+    local:
+    - name: L2
+      class: DRAM
+      attributes:
+        word-bits: 16
+        block-size: 32
+        technology: 16nm
+        read_bandwidth: 25
+        sizeKB: 1600000000
+    subtree:
+    - name: Buffer[0..3]
+      attributes:
+        meshX: 4
+      local:
+      - name: L1
+        class: SRAM
+        attributes:
+          width: 16
+          word-bits: 16
+          technology: 16nm
+          read_bandwidth: 500
+          sizeKB: 2000
+      subtree:
+      - name: PE
+        attributes:
+        local:
+        - name: L0[0..1023]
+          class: regfile
+          attributes:
+            depth: 1
+            meshX: 1024
+            word-bits: 16
+            block-size: 30
+            technology: 16nm
+            read_bandwidth: 3
+        - name: mac[0..1023]
+          class: intmac
+          attributes:
+            meshX: 1024
+
+mapping:
+  node-type: Tile
+  type: Temporal
+  factors: B=BO H=HO W=WO
+  permutation: BHW
+  target: L2
+
+  subtree:
+    - node-type: Tile
+      type: Spatial
+      factors: H=HS W=WS
+      permutation: HW
+      target: L2
+
+      subtree:
+        - node-type: Scope
+          type: Sequential
+
+          subtree:
+            - node-type: Tile
+              type: Temporal
+              factors: H=HM W=WM C=CM L=LM
+              permutation: HWCL
+              target: L1
+
+              subtree:
+                - node-type: Tile
+                  type: Spatial
+                  factors: C=CS L=LS
+                  permutation: CL
+                  target: L1
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: R=RI S=SI
+                      permutation: RS
+                      target: L0
+
+                      subtree:
+                        - node-type: Op
+                          name: ProduceA
+            - node-type: Tile
+              type: Temporal
+              factors: H=HM2 W=WM2 L=LM2 K=KM2
+              permutation: HWLK
+              target: L1
+
+              subtree:
+                - node-type: Tile
+                  type: Spatial
+                  factors: L=LS2 K=KS
+                  permutation: LK
+                  target: L1
+
+                  subtree:
+                    - node-type: Tile
+                      type: Temporal
+                      factors: U=UI V=VI
+                      permutation: UV
+                      target: L0
+
+                      subtree:
+                        - node-type: Op
+                          name: ProduceD
+
+check: 
+  loopcount: False
