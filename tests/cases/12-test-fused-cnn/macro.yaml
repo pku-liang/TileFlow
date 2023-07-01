@@ -1,0 +1,16 @@
+macro:
+  B: 1
+  H: 112
+  W: 112 
+  C: 64 
+  L: 192
+  K: 128
+  R: 3
+  S: 3
+  U: 1
+  V: 1      
+tileflow-mapper:
+  timeout: 60
+verbose: 0
+check: 
+    loopcount: False
