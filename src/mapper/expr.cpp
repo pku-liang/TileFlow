@@ -20,18 +20,39 @@ num_t SumExpr::eval(const SymbolTable& symb_table) {
     return ret; 
 }
 
-void SumExpr::display(const SymbolTable& symb_table) {
+num_t MaxExpr::eval(const SymbolTable& symb_table) {
+    num_t ret = 0;
+    for (auto& op: operands_)
+        ret = std::max(ret, op->eval(symb_table));
+    return ret; 
+}
+
+void SumExpr::display(const SymbolTable& symb_table, std::ostream& o) {
     bool is_first = true;
-    if (operands_.size() > 1) std::cout << "(";
+    if (operands_.size() > 1) o << "(";
     for (auto& op: operands_) {
         if (!is_first)
-            std::cout << "+";
+            o << "+";
         else is_first = false;
-        op->display(symb_table);
+        op->display(symb_table, o);
     }
     if (is_first) 
-        std::cout << 1;
-    if (operands_.size() > 1) std::cout << ")";
+        o << 1;
+    if (operands_.size() > 1) o << ")";
+}
+
+void MaxExpr::display(const SymbolTable& symb_table, std::ostream& o) {
+    bool is_first = true;
+    if (operands_.size() > 1) o << "Max(";
+    for (auto& op: operands_) {
+        if (!is_first)
+            o << ",";
+        else is_first = false;
+        op->display(symb_table, o);
+    }
+    if (is_first) 
+        o << 1;
+    if (operands_.size() > 1) o << ")";
 }
 
 ProductExpr::ProductExpr(const std::vector<int>& operands) {
@@ -55,16 +76,16 @@ num_t ProductExpr::eval(const SymbolTable& symb_table) {
     return ret; 
 }
 
-void ProductExpr::display(const SymbolTable& symb_table) {
+void ProductExpr::display(const SymbolTable& symb_table, std::ostream& o) {
     bool is_first = true;
     for (auto& op: operands_) {
         if (!is_first)
-            std::cout << "*";
+            o << "*";
         else is_first = false;
-        op->display(symb_table);
+        op->display(symb_table, o);
     }
     if (is_first) 
-        std::cout << 1;
+        o << 1;
 }
 
 num_t VariableExpr::eval(const SymbolTable& symb_table) {
@@ -73,18 +94,18 @@ num_t VariableExpr::eval(const SymbolTable& symb_table) {
     return 1;
 }
 
-void VariableExpr::display(const SymbolTable& symb_table) {
+void VariableExpr::display(const SymbolTable& symb_table, std::ostream& o) {
     auto & entry = symb_table.lookup(idx_);
-    std::cout << entry.name_;
-    if (entry.fixed_) std::cout << "(" << entry.value_ << ")";
+    o << entry.name_;
+    if (entry.fixed_) o << "(" << entry.value_ << ")";
 }
 
 num_t ParameterExpr::eval(const SymbolTable& ) {
     return value_;
 }
 
-void ParameterExpr::display(const SymbolTable& ) {
-    std::cout << value_;
+void ParameterExpr::display(const SymbolTable& , std::ostream& o) {
+    o << value_;
 }
 
 num_t CondExpr::eval(const SymbolTable& symb_table) {
@@ -97,35 +118,35 @@ num_t CondExpr::eval(const SymbolTable& symb_table) {
     return 0;
 }
 
-void CondExpr::display(const SymbolTable& symb_table) {
-    left_->display(symb_table);
-    if (op_ == CondExpr::EQU) std::cout << "==";
-    else if (op_ == CondExpr::LESS) std::cout << "<";
-    else if (op_ == CondExpr::LEQ) std::cout << "<=";
-    right_->display(symb_table);
+void CondExpr::display(const SymbolTable& symb_table, std::ostream& o) {
+    left_->display(symb_table, o);
+    if (op_ == CondExpr::EQU) o << "==";
+    else if (op_ == CondExpr::LESS) o << "<";
+    else if (op_ == CondExpr::LEQ) o << "<=";
+    right_->display(symb_table, o);
 }
 
-void PairExpr::display(const SymbolTable& symb_table) {
-    std::cout << "<";
-    x_->display(symb_table);
-    std::cout << ", ";
-    y_->display(symb_table);
-    std::cout << ">";
+void PairExpr::display(const SymbolTable& symb_table, std::ostream& o) {
+    o << "<";
+    x_->display(symb_table, o);
+    o << ", ";
+    y_->display(symb_table, o);
+    o << ">";
 }
 
 std::pair<int, int> PairExpr::eval_pair(const SymbolTable& symb_table, int) {
     return {x_->eval(symb_table), y_->eval(symb_table)};
 }
 
-void PairSumExpr::display(const SymbolTable& symb_table) {
+void PairSumExpr::display(const SymbolTable& symb_table, std::ostream& o) {
     bool isFirst = true;
-    if (operands_.size() > 1) std::cout << "(";
+    if (operands_.size() > 1) o << "(";
     for (auto& operand: operands_) {
-        if (!isFirst) std::cout << "+";
+        if (!isFirst) o << "+";
         else isFirst = false;
-        operand->display(symb_table);
+        operand->display(symb_table, o);
     }
-    if (operands_.size() > 1) std::cout << ")";
+    if (operands_.size() > 1) o << ")";
 }
 
 std::pair<int, int> PairSumExpr::eval_pair(const SymbolTable& symb_table, int limit_y) {
@@ -152,15 +173,15 @@ std::pair<int, int> PairSumExpr::eval_pair(const SymbolTable& symb_table, int li
 }
 
 
-void PairMaxExpr::display(const SymbolTable& symb_table) {
+void PairMaxExpr::display(const SymbolTable& symb_table, std::ostream& o) {
     bool isFirst = true;
-    if (operands_.size() > 1) std::cout << "Max(";
+    if (operands_.size() > 1) o << "Max(";
     for (auto& operand: operands_) {
-        if (!isFirst) std::cout << ",";
+        if (!isFirst) o << ",";
         else isFirst = false;
-        operand->display(symb_table);
+        operand->display(symb_table, o);
     }
-    if (operands_.size() > 1) std::cout << ")";
+    if (operands_.size() > 1) o << ")";
 }
 
 std::pair<int, int> PairMaxExpr::eval_pair(const SymbolTable& symb_table, int limit_y) {
@@ -173,10 +194,10 @@ std::pair<int, int> PairMaxExpr::eval_pair(const SymbolTable& symb_table, int li
     return {max_x, max_y};
 }
 
-void PairCondExpr::display(const SymbolTable& symb_table) {
-    expr_->display(symb_table);
-    if (op_ == PairCondExpr::LEQ) std::cout << "<=";
-    limit_->display(symb_table);
+void PairCondExpr::display(const SymbolTable& symb_table, std::ostream& o) {
+    expr_->display(symb_table, o);
+    if (op_ == PairCondExpr::LEQ) o << "<=";
+    limit_->display(symb_table, o);
 }
 
 num_t PairCondExpr::eval(const SymbolTable& symb_table) {
@@ -396,6 +417,9 @@ void ExprVisitor::visitCondExpr(const CondExpr*expr){
     expr->left_->accept(this); expr->right_->accept(this);
 }
 void ExprVisitor::visitSumExpr(const SumExpr* expr) {
+    for (auto& operand: expr->operands_) operand->accept(this);
+}
+void ExprVisitor::visitMaxExpr(const MaxExpr* expr) {
     for (auto& operand: expr->operands_) operand->accept(this);
 }
 

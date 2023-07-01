@@ -381,7 +381,7 @@ namespace analysis
             }
             if (verbose_level > 1) {
                 std::cout << "===========Offset Calculation=========" << std::endl;
-                std::cout << "Node:" << std::endl;
+                std::cout << "Node:" << node->get_name() << std::endl;
                 node->display("\t", false, analysis_.symb_table_);
                 std::cout << "input:" << init_offset << std::endl;
                 std::cout << "output: " << output_offset << std::endl;

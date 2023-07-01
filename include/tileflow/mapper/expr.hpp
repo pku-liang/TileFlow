@@ -6,6 +6,7 @@
 #include <memory>
 #include <set>
 #include <functional>
+#include <iostream>
 
 namespace TileFlow {
     const int ERROR_OUT=1;
@@ -50,13 +51,17 @@ namespace TileFlow {
         Entry& operator[](int key) {return idx2values_[key];}
         int insert(const std::string name = "") {
             std::string name_ = name;
-            for (int i = 0; name2idx_.count(name_); i++){
-                name_ = name + std::to_string(i);
+            if (name_ == "?" || name_ == "X"){
+                for (int i = 0; name2idx_.count(name_); i++){
+                    name_ = name + std::to_string(i);
+                }
             }
-            idx--;
-            name2idx_[name_] = idx;
-            idx2values_[idx] = {name_, 0, idx, {}, false};
-            return idx;
+            if (name2idx_.count(name_) == 0) {
+                idx--;
+                name2idx_[name_] = idx;
+                idx2values_[idx] = {name_, 0, idx, {}, false};
+            }
+            return name2idx_.at(name_);
         }
 
         void init(const std::vector<Constraint>& constraints_);
@@ -76,6 +81,7 @@ namespace TileFlow {
     struct ParameterExpr;
     struct CondExpr;
     struct SumExpr;
+    struct MaxExpr;
 
     struct ExprVisitor {
         virtual void visitPairExpr(const PairExpr*);
@@ -84,6 +90,7 @@ namespace TileFlow {
         virtual void visitPairCondExpr(const PairCondExpr*);
         virtual void visitProductExpr(const ProductExpr*);
         virtual void visitSumExpr(const SumExpr*);
+        virtual void visitMaxExpr(const MaxExpr*);
         virtual void visitVariableExpr(const VariableExpr*);
         virtual void visitParameterExpr(const ParameterExpr*);
         virtual void visitCondExpr(const CondExpr*);
@@ -91,13 +98,13 @@ namespace TileFlow {
 
     struct Expr {
         virtual num_t eval(const SymbolTable&) = 0;
-        virtual void display(const SymbolTable&) = 0;
+        virtual void display(const SymbolTable&, std::ostream& = std::cout) = 0;
         virtual void accept(ExprVisitor*) const = 0;
     };
 
     struct ResourceExpr: public Expr {
         virtual num_t eval(const SymbolTable& ) override {return 0;}
-        virtual void display(const SymbolTable& ) override {}
+        virtual void display(const SymbolTable&, std::ostream&) override {}
         // given y's limit, compute minimum required x
         virtual std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) = 0;
         virtual void accept(ExprVisitor* visitor) const = 0;
@@ -108,7 +115,7 @@ namespace TileFlow {
         std::shared_ptr<Expr> y_;
         PairExpr(const std::shared_ptr<Expr>& x, 
             const std::shared_ptr<Expr>& y): x_(x), y_(y) {}
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitPairExpr(this);}
     };
@@ -117,7 +124,7 @@ namespace TileFlow {
         std::vector<std::shared_ptr<ResourceExpr> > operands_;
         PairSumExpr(std::vector<std::shared_ptr<ResourceExpr> >& operands):
             operands_(operands){}
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitPairSumExpr(this);}
     };
@@ -126,7 +133,7 @@ namespace TileFlow {
         std::vector<std::shared_ptr<ResourceExpr> > operands_;
         PairMaxExpr(std::vector<std::shared_ptr<ResourceExpr> >& operands):
             operands_(operands){}
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitPairMaxExpr(this);}
     };
@@ -141,7 +148,7 @@ namespace TileFlow {
             std::shared_ptr<ResourceExpr> expr,
             std::shared_ptr<ResourceExpr> limit, 
             type_t op): expr_(expr), limit_(limit), op_(op) {}
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         num_t eval(const SymbolTable& symb_table) override;
         std::pair<int, int> eval_pair(const SymbolTable& symb_table, int limit_y) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitPairCondExpr(this);}
@@ -152,8 +159,17 @@ namespace TileFlow {
         SumExpr(std::vector<std::shared_ptr<Expr> >& operands):
             operands_(operands){}
         num_t eval(const SymbolTable& symb_table) override;
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitSumExpr(this);}
+    };
+    
+    struct MaxExpr: public Expr {
+        std::vector<std::shared_ptr<Expr> > operands_;
+        MaxExpr(std::vector<std::shared_ptr<Expr> >& operands):
+            operands_(operands){}
+        num_t eval(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
+        void accept(ExprVisitor* visitor) const override {visitor->visitMaxExpr(this);}
     };
 
     struct ProductExpr: public Expr {
@@ -165,14 +181,14 @@ namespace TileFlow {
         ProductExpr(const std::vector<int>& operands);
         ProductExpr(const std::pair<num_t, std::vector<int> >& operands);
         num_t eval(const SymbolTable& symb_table) override;
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitProductExpr(this);}
     };
     struct VariableExpr: public Expr {
         int idx_;
         VariableExpr(int idx): idx_(idx){}
         num_t eval(const SymbolTable& symb_table) override;
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitVariableExpr(this);}
     };
 
@@ -180,7 +196,7 @@ namespace TileFlow {
         num_t value_;
         ParameterExpr(num_t value): value_(value){}
         num_t eval(const SymbolTable& symb_table) override;
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitParameterExpr(this);}
     };
     
@@ -197,7 +213,7 @@ namespace TileFlow {
                 CondExpr::type_t op):
         op_(op), left_(left), right_(right){}
         num_t eval(const SymbolTable& symb_table) override;
-        void display(const SymbolTable& symb_table) override;
+        void display(const SymbolTable& symb_table, std::ostream&) override;
         void accept(ExprVisitor* visitor) const override {visitor->visitCondExpr(this);}
     };
 
@@ -221,7 +237,37 @@ namespace TileFlow {
             return std::move(variables_);
         }
     };
-
+/*
+    struct Simplifier: public ExprVisitor {
+        bool isSum;
+        std::vector<std::shared_ptr<Expr> > operands_;
+        void visitSumExpr(const SumExpr* expr) override {
+            std::vector<std::shared_ptr<Expr> > operands; 
+            for (auto operand: expr->operands_) {
+                isSum = false;
+                operands_.clear();
+                operand->accept(this);
+                if (isSum) {
+                    operands.insert(operands.end(), operands_.begin(), operands_.end());
+                }
+                else operands.push_back(operand);
+            }
+            const_cast<SumExpr*>(expr)->operands_ = operands;
+            operands_ = operands;
+            isSum = true;
+        }
+        void visitPairExpr(const PairExpr*) {isSum=false; }
+        void visitPairSumExpr(const PairSumExpr*) {isSum=false; }
+        void visitPairMaxExpr(const PairMaxExpr*) {isSum=false; }
+        void visitPairCondExpr(const PairCondExpr*) {isSum=false; }
+        void visitProductExpr(const ProductExpr*) {isSum=false; }
+        void visitSumExpr(const SumExpr*) {isSum=false; }
+        void visitMaxExpr(const MaxExpr*) {isSum=false; }
+        void visitVariableExpr(const VariableExpr*) {isSum=false; }
+        void visitParameterExpr(const ParameterExpr*) {isSum=false; }
+        void visitCondExpr(const CondExpr*) {isSum=false; }
+    };
+*/
     struct Constraint {
         enum {
             LOOPCOUNT,

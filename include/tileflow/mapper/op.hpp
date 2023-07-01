@@ -20,9 +20,13 @@ std::shared_ptr<ResourceExpr> pair(
 
 std::shared_ptr<Expr> product(std::vector<std::shared_ptr<Expr> >& exprs);
 
+std::shared_ptr<Expr> product(std::initializer_list<std::shared_ptr<Expr>> exprs);
+
 std::shared_ptr<Expr> product(const std::pair<num_t, std::vector<int> >& exprs);
 
 std::shared_ptr<Expr> sum(std::vector<std::shared_ptr<Expr> >& exprs);
+
+std::shared_ptr<Expr> max(std::vector<std::shared_ptr<Expr> >& exprs);
 
 std::shared_ptr<Expr> variable(int x);
 

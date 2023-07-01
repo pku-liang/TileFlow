@@ -204,11 +204,10 @@ namespace analysis
                 0, 
                 ret.cycle_, break_on_failure);
             assert(storage_level->Cycles() >= ret.cycle_);
-
+            double slow_down = storage_level->Cycles() / (0.0 + ret.cycle_);
             ret.cycle_ = storage_level->Cycles();
 
             if (profile) {
-                double slow_down = storage_level->Cycles() / (0.0 + ret.cycle_);
                 storage_level->FinalizeBufferEnergy();
                 energy_ += storage_level->Energy();
 

@@ -243,12 +243,18 @@ void Checker::add_access_pattern(
     // }
 
     if (producer_id != problem::Shape::DataSpaceID(-1)) {
+        bool isTop = true;
         while (!sp.empty()) {
             auto node = sp.top();
             sp.pop();
             if (node->is_bypassed(
                 problem::GetShape()->DataSpaceIDToName.at(producer_id)))
                 continue;
+            if (isTop) {
+                assert(node->get_type() == Node::Tile);
+                init_scope_[node][producer_id] = common;
+                isTop = false;
+            }
             if (problem::GetShape()->IsReadWriteDataSpace.at(producer_id)) {
                 node->get_active_tensors().read_tensors.insert(producer_id);
                 if (!sp.empty()) {
@@ -263,12 +269,18 @@ void Checker::add_access_pattern(
     }
 
     if (consumer_id != problem::Shape::DataSpaceID(-1)) {
+        bool isTop = true;
         while (!sc.empty()) {
             auto node = sc.top();
             sc.pop();
             if (node->is_bypassed(
                 problem::GetShape()->DataSpaceIDToName.at(consumer_id)))
                 continue;
+            if (isTop) {
+                assert(node->get_type() == Node::Tile);
+                init_scope_[node][consumer_id] = common;
+                isTop = false;
+            }
             node->get_active_tensors().read_tensors.insert(consumer_id);
             if (!sc.empty()) {
                 sc.top()->get_active_tensors().fill_tensors.insert(consumer_id);
@@ -309,7 +321,7 @@ void Checker::get_shape_constraints() {
 }
 
 void Checker::get_memory_constraints() {
-    MemoryConstraintParser parser(workloads_.get_workload(), topology_);
+    MemoryConstraintParser parser(workloads_.get_workload(), topology_, init_scope_);
     auto cons = parser.parse(mapping_.root);
     constraints.insert(constraints.end(), cons.begin(), cons.end());
 }
@@ -320,7 +332,7 @@ void Checker::get_resource_constraints() {
     constraints.insert(constraints.end(), cons.begin(), cons.end());
 }
 
-std::shared_ptr<Expr> MemoryConstraintParser::cal_footprint(unsigned pv) {
+std::shared_ptr<Expr> MemoryConstraintParser::cal_footprint(const Node* node, unsigned pv) {
     std::vector<std::shared_ptr<Expr>> prod;
     for (unsigned data_space_dim = 0; data_space_dim < problem::GetShape()->DataSpaceOrder.at(pv); 
     data_space_dim++)
@@ -335,21 +347,14 @@ std::shared_ptr<Expr> MemoryConstraintParser::cal_footprint(unsigned pv) {
                 coeff = workload_.GetCoefficient(term.first);
                 if (coeff < 0) coeff = -coeff;
             }
-            auto & factor = factors_[term.second];
-            coeff *= factors_[term.second].first;
+            auto & factor = node2factors_[
+                (init_scope_.count(node) && init_scope_[node].count(pv))? init_scope_[node][pv]:node][term.second];
+
             std::vector<std::shared_ptr<Expr> > exprs;
             if (coeff != 1) {
-                exprs.push_back(parameter(coeff));
+                sum.push_back(product({parameter(coeff), factor}));
             }
-            if (factor.second.size() == 1) {
-                exprs.push_back(variable(factor.second.front()));
-            }
-            else {
-                for (auto id: factor.second)
-                    exprs.push_back(variable(id));
-            }
-            if (exprs.size() == 1) sum.push_back(exprs.front());
-            else sum.push_back(product(exprs));
+            else sum.push_back(factor);
         }
         if (sum.size() == 1) prod.push_back(sum.front());
         else prod.push_back(Op::sum(sum));
@@ -365,21 +370,24 @@ void MemoryConstraintParser::visitTile(
     for (auto& loop: node->get_loops()) {
         auto& factor = factors_[loop.dimension];
         if (loop.end > 0) 
-            factor.first *= loop.end;
-        else factor.second.push_back(loop.end);
+            factor = product({parameter(loop.end), factor});
+        else factor = product({variable(loop.end), factor});
     }
 
-    if (node->get_tile_type() == TileNode::Temporal) {
-        add_constraint(node);
+    node2factors_[node] = factors_;
+
+    if (node->get_tile_type() == TileNode::Temporal && node->is_profile()) {
+        constraint_nodes_.push_back(node);
     }
 }
 
 void MemoryConstraintParser::visitOp(
-    const OpNode* 
+    const OpNode* node
 ){
     factors_.clear();
-    factors_.resize(problem::GetShape()->NumFlattenedDimensions);
-    for (auto& factor: factors_) factor.first = 1;
+    for (int i = 0; i < (int)problem::GetShape()->NumFlattenedDimensions; ++i)
+        factors_.push_back(parameter(1));
+    node2factors_[node] = factors_;
 }
 
 void MemoryConstraintParser::add_constraint(const Node* node) {
@@ -392,7 +400,7 @@ void MemoryConstraintParser::add_constraint(const Node* node) {
         node->get_active_tensors().update_tensors.end());
     std::vector<std::shared_ptr<Expr> > footprints;
     for (auto pv: active_tensors)
-        footprints.push_back(cal_footprint(pv));
+        footprints.push_back(cal_footprint(node, pv));
     
     constraints_.push_back({
         Constraint::MEM,
@@ -405,16 +413,31 @@ void MemoryConstraintParser::add_constraint(const Node* node) {
 void MemoryConstraintParser::visitScope(
     const ScopeNode* node 
 ) {
+    std::vector<std::vector<std::shared_ptr<Expr> > > exprs;
     for (auto child: node->get_children()){
         child->accept(this);
+        exprs.resize(factors_.size());
+        for (int i = 0; i < (int) factors_.size(); i++) {
+            exprs[i].push_back(factors_[i]);
+        }
     }
+
+    auto& factors = node2factors_[node];
+    
+    for (auto& expr: exprs) factors.push_back(max(expr));
+
+    factors_ = factors;
+
     if (node->get_scope_type() == ScopeNode::Sharing) {
-        add_constraint(node);
+        constraint_nodes_.push_back(node);
     }
 }
 
 std::vector<Constraint> MemoryConstraintParser::parse(const Node* root){
     root->accept(this);
+    for (auto node: constraint_nodes_) {
+        add_constraint(node);
+    }
     return constraints_;
 } 
 
@@ -473,12 +496,11 @@ void ResourceConstraintParser::visitTile(const TileNode* node) {
             else tmp_.first *= loop.end;
         }
         core_usage_ = pair(product(xs), product(ys));
+        add_constraint(node);
     }
     else {
         core_usage_ = pair(1,1);
     }
-
-    add_constraint(node);
 }
 
 void ResourceConstraintParser::visitScope(const ScopeNode* node) {

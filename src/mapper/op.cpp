@@ -49,6 +49,10 @@ std::shared_ptr<Expr> product(std::vector<std::shared_ptr<Expr>>& exprs) {
     return std::make_shared<ProductExpr>(exprs);
 }
 
+std::shared_ptr<Expr> product(std::initializer_list<std::shared_ptr<Expr>> exprs) {
+    return std::make_shared<ProductExpr>(exprs);
+}
+
 std::shared_ptr<Expr> product(const std::pair<num_t, std::vector<int> >& exprs){
     return std::make_shared<ProductExpr>(exprs);
 }
@@ -57,6 +61,12 @@ std::shared_ptr<Expr> sum(std::vector<std::shared_ptr<Expr> >& exprs) {
     if (!exprs.size()) return parameter(0);
     if (exprs.size() == 1) return exprs.front();
     return std::make_shared<SumExpr>(exprs);
+}
+
+std::shared_ptr<Expr> max(std::vector<std::shared_ptr<Expr> >& exprs) {
+    if (!exprs.size()) return parameter(0);
+    if (exprs.size() == 1) return exprs.front();
+    return std::make_shared<MaxExpr>(exprs);
 }
 
 std::shared_ptr<Expr> variable(int x) {

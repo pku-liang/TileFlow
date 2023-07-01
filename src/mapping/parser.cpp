@@ -29,6 +29,10 @@ Node::Node(
         config.lookupArrayValue("bypass", bypassed_);
     
     config.lookupValue("profile", profile_);
+    std::string tag = "";
+    config.lookupValue("tag", tag);
+    if (tag.size())
+        name_ += "::" + tag;
 }
 
 ScopeNode::ScopeNode(config::CompoundConfigNode config): Node(Node::Scope, config){

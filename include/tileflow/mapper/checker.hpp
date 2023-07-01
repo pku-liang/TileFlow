@@ -32,17 +32,27 @@ namespace TileFlow {
         void visitTile(const TileNode*) override;
         void visitOp(const OpNode*) override;
         void visitScope(const ScopeNode*) override;
-        std::shared_ptr<Expr> cal_footprint(unsigned pv);
-        std::vector<std::pair<int, std::vector<int> > > factors_;
+        std::shared_ptr<Expr> cal_footprint(const Node * node, unsigned pv);
+        // std::vector<std::pair<int, std::vector<int> > > factors_;
+        std::vector<std::shared_ptr<Expr> > factors_; 
+        std::unordered_map<const Node*, std::vector<std::shared_ptr<Expr> > >  node2factors_;
         const problem::Workload& workload_;
         const model::Topology& topology_;
         std::vector<Constraint> constraints_;
+        std::vector<const Node*> constraint_nodes_;
+
+        std::unordered_map<
+        const Node*, std::unordered_map<unsigned, const Node*> >& init_scope_;
         void add_constraint(const Node*node);
+        std::vector<std::shared_ptr<Expr> > factor2expr(
+            const std::vector<std::pair<int, std::vector<int> > >& factors);
     public:
         MemoryConstraintParser(
             const problem::Workload& workload, 
-            const model::Topology& topology): 
-            workload_(workload), topology_(topology){}
+            const model::Topology& topology,
+            std::unordered_map<
+            const Node*, std::unordered_map<unsigned, const Node*> >& init_scope): 
+            workload_(workload), topology_(topology), init_scope_(init_scope){}
         std::vector<Constraint> parse(const Node*root);
     };
 
@@ -89,6 +99,9 @@ namespace TileFlow {
         bool enable_mem_check_;
         bool enable_spatial_check_;
         bool enable_loopcount_check_;
+
+        std::unordered_map<
+            const Node*, std::unordered_map<unsigned, const Node*> > init_scope_;
 
         std::vector<Constraint > constraints;
         void swap_spatial_scope();
