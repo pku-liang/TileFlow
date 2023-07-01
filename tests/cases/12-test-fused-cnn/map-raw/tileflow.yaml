@@ -1,0 +1,12 @@
+for b,w,h in (BO,WO,HO): # target: L2
+  scope Sequential 
+    pfor h,w in (HS,WS): #target: L2, split: 1
+      for c,l,h,w in (HM, WM, CM, LM): #target: L1
+        pfor c,l in (CS, LS): # target: L1, split: 1
+          for r,s in (RI,SI): # target: L0 
+            op ProduceA
+    pfor h,w in (HS,WS): #target: L2, split: 1
+      for l,k,h,w in (HM2,WM2,LM2,KM2): #target: L1
+        pfor l,k in (LS2, KS): # target: L1, split: 1
+          for u,v in (UI, VI): # target: L0
+            op ProduceD

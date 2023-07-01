@@ -1,0 +1,70 @@
+problem:
+  io:
+    ins: I X Y
+    outs: D
+  dimensions: [B,H,W,C,L,K,R,S,U,V]
+  instance:
+    B: B
+    H: H
+    W: W
+    C: C
+    L: L
+    K: K
+    R: R
+    S: S
+    U: U
+    V: V
+
+  ops:
+  - name: ProduceA
+    dimensions: [L,C,R,S,B,H,W,U,V]
+    data-spaces:
+    - name: A
+      projection:
+        - [[B]]
+        - [[L]]
+        - [[H], [U]]
+        - [[W], [V]]
+      read-write: True
+    - name: X
+      projection:
+        - [[L]]
+        - [[C]]
+        - [[R]]
+        - [[S]]
+    - name: I
+      projection:
+        - [[B]]
+        - [[C]]
+        - [[H],[R]]
+        - [[W],[S]]
+    ins: X, I
+    out: A
+
+  - name: ProduceD
+    dimensions: [K,L,U,V,B,H,W]
+    data-spaces:
+    - name: D
+      projection:
+        - [[B]]
+        - [[K]]
+        - [[H]]
+        - [[W]]
+      read-write: True
+    - name: Y
+      projection:
+        - [[K]]
+        - [[L]]
+        - [[U]]
+        - [[V]]
+    - name: A
+      projection:
+        - [[B]]
+        - [[L]]
+        - [[H],[U]]
+        - [[W],[V]]
+    ins: Y, A
+    out: D
+
+check: 
+  loopcount: False

@@ -1,0 +1,83 @@
+mapping:
+  node-type: Scope
+  type: Sequential
+
+  subtree:
+  - node-type: Tile
+    type: Temporal
+    factors: B=BO H=HO W=WO
+    permutation: WHB
+    target: L2
+
+    subtree:
+    - node-type: Tile
+      type: Spatial
+      factors: H=HS W=WS
+      permutation: WH
+      target: L2
+      split: 1
+
+      subtree:
+      - node-type: Tile
+        type: Temporal
+        factors: C=HM L=WM H=CM W=LM
+        permutation: WHLC
+        target: L1
+
+        subtree:
+        - node-type: Tile
+          type: Spatial
+          factors: C=CS L=LS
+          permutation: LC
+          target: L1
+          split: 1
+
+          subtree:
+          - node-type: Tile
+            type: Temporal
+            factors: R=RI S=SI
+            permutation: SR
+            target: L0
+
+            subtree:
+            - node-type: Op
+              name: ProduceA
+  - node-type: Tile
+    type: Temporal
+    factors: B=BO H=HO W=WO
+    permutation: WHB
+    target: L2
+
+    subtree:
+    - node-type: Tile
+      type: Spatial
+      factors: H=HS W=WS
+      permutation: WH
+      target: L2
+      split: 1
+
+      subtree:
+      - node-type: Tile
+        type: Temporal
+        factors: L=HM2 K=WM2 H=LM2 W=KM2
+        permutation: WHKL
+        target: L1
+
+        subtree:
+        - node-type: Tile
+          type: Spatial
+          factors: L=LS2 K=KS
+          permutation: KL
+          target: L1
+          split: 1
+
+          subtree:
+          - node-type: Tile
+            type: Temporal
+            factors: U=UI V=VI
+            permutation: VU
+            target: L0
+
+            subtree:
+            - node-type: Op
+              name: ProduceD
