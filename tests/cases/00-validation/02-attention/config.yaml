@@ -1,0 +1,13 @@
+macro: 
+  M: 512
+  N: 64
+  K: 64 
+  L: 512
+  SX: 16 
+  SY: 16 
+
+tileflow-mapper: 
+  topk: 20
+  timeout: 1200
+verbose: 1
+output: topk-experiment 

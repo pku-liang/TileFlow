@@ -27,9 +27,10 @@ const SymbolTable* Mapper::search() {
         optimum_ = global_symbol_table_;
         return &optimum_;
     }
-    Env env(constraints_, global_symbol_table_, analyzer, obj_);
+    Env env(constraints_, global_symbol_table_, analyzer, obj_, topk_);
     alg_->set_env(&env);
     alg_->search();
+    if(verbose_level) env.report(std::cerr);
     auto ret = env.get_best_symbol_table();
     TILEFLOW_ASSERT(ret, "no candidate found");
     TILEFLOW_LOG("best factors: "; ret->show_brief(std::cout); std::cerr);
@@ -134,6 +135,8 @@ Reward Env::calculate_reward(){
         reward.reward = -std::log10(reward.value);
         // std::cout << "analyzed reward:" << reward.reward << std::endl;
         
+        insert(&curr_state_->symbol_table_, reward.value);
+
         if (reward > best_reward_) {
             TILEFLOW_LOG("Update best "; if (verbose_level) curr_state_->symbol_table_.show_brief(std::cerr); std::cerr 
                     << " value: " <<  reward.value);
@@ -145,6 +148,25 @@ Reward Env::calculate_reward(){
     }
     // std::cout << "calculated reward:" << reward.reward << std::endl;
     return reward;
+}
+
+void Env::insert(const SymbolTable* table, double value){
+    auto iter = topKList_.begin();
+    while (iter != topKList_.end() && value > iter -> second) iter ++;
+    topKList_.insert(iter, {table, value});
+    if (topKList_.size() > topk_) topKList_.pop_back();
+}
+
+std::ostream& Env::report(std::ostream& o) const {
+    o << "=========Top " << topKList_.size() << " ===========" << std::endl;
+    for (unsigned i = 0; i < topKList_.size(); i++) {
+        o << i << ":\t";
+        auto & item = topKList_.at(i);
+        item.first->show_brief(o);
+        o << ", value: " << item.second << std::endl;
+    }
+    o << "=======Top " << topKList_.size() << " End==========" << std::endl;
+    return o;
 }
 
 State* MCTS::select_state() {

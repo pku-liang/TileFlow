@@ -114,13 +114,19 @@ private:
     bool expanded_ = false;
     Reward best_reward_ = {-1e9, 0.0};
 
+    unsigned topk_;
+    std::vector<std::pair<const SymbolTable*, double> > topKList_;
+    void insert(const SymbolTable*, double);
+
 public:
     Env(const std::vector<Constraint>& constraints, 
         const SymbolTable& symbol_table, 
         analysis::TileFlow::NestAnalysis& analyzer,
-        Objective obj): constraints_(constraints),
-    root_(new State(symbol_table, constraints)), best_symbol_table_(nullptr),
-        analyzer_(analyzer), obj_(obj) {reset();
+        Objective obj, 
+        unsigned topK = 1): constraints_(constraints),
+    root_(new State(symbol_table, constraints)), 
+    best_symbol_table_(nullptr), analyzer_(analyzer), obj_(obj),
+    topk_(topK) {reset();
         if (verbose_level > 1) {    
         std::cout << "init env..." << std::endl;
         std::cout << *root_ << std::endl;} }
@@ -142,6 +148,7 @@ public:
     const SymbolTable* get_best_symbol_table() const {
         return best_symbol_table_;    
     }
+    std::ostream& report(std::ostream& o) const;
 };
 
 std::ostream& operator<< (std::ostream& o, const Env& env);
@@ -203,6 +210,7 @@ class Mapper {
     Objective obj_;
     std::unique_ptr<Algorithm> alg_;
     unsigned timeout_;
+    unsigned topk_;
     void report_csv(std::ostream&);
     void report_mapping(std::ostream&);
 
@@ -212,12 +220,12 @@ public:
         const mapping::TileFlow::Mapping& mapping_, 
         const model::Engine::Specs& arch_specs_, 
         const model::Topology& topology_, 
-        Objective obj, unsigned timeout = 600, 
-        const std::string alg = "mcts"):
+        Objective obj, unsigned timeout = 600,
+        const std::string alg = "mcts", unsigned topk = 1):
         constraints_(constraints_), workloads_(workloads_), 
         mapping_(mapping_), arch_specs_(arch_specs_), 
         topology_(topology_), obj_(obj),
-        timeout_(timeout) {
+        timeout_(timeout), topk_(topk) {
             if (alg == "mcts" || alg == "MCTS")
                 alg_ = std::make_unique<MCTS>(timeout);
             else if (alg == "random" || alg == "RANDOM")

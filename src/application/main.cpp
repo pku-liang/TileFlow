@@ -139,6 +139,7 @@ int main(int argc, char* argv[])
 
   TileFlow::mapper::Objective obj = TileFlow::mapper::CYCLE;
   unsigned timeout = 600;
+  unsigned topk = 1;
   std::string search_alg = "random";
   if (root.exists("tileflow-mapper")) {
     auto mapper = root.lookup("tileflow-mapper");
@@ -149,9 +150,10 @@ int main(int argc, char* argv[])
     }
     mapper.lookupValue("timeout", timeout);
     mapper.lookupValue("alg", search_alg);
+    mapper.lookupValue("topk", topk);
   }
 
-  TileFlow::mapper::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, obj, timeout, search_alg);
+  TileFlow::mapper::Mapper mapper(checker.get_constraints(), workloads, mapping, arch_specs_, topology, obj, timeout, search_alg, topk);
 
   auto result = mapper.search();
   assert(result);
