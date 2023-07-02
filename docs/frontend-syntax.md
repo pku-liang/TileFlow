@@ -91,6 +91,7 @@ There are three kinds of nodes:
 - Attributes: 
     - `alg`[random, mtcs]: the searching algorithm for mapper;
     - `timeout`[INT]: the searching timeout in seconds;
+    - `topk`(unsigned): record topK candidates.
 
 ## Macro Scope: 
     - key(string): value(int) pairs of macros. The macros can be used for instanciation of `factor` scope of `tile` nodes, and the instanciation of `instance scope` of `problem scope`. 

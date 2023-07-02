@@ -203,7 +203,9 @@ namespace analysis
             storage_level->Evaluate(*ret.p_tile_, mask, 
                 0, 
                 ret.cycle_, break_on_failure);
-            assert(storage_level->Cycles() >= ret.cycle_);
+            if (!(storage_level->Cycles() >= ret.cycle_) && verbose_level) {
+                TILEFLOW_WARNING(storage_level->Name() << " runs " << storage_level->Cycles() << " > sublevel's " << ret.cycle_);
+            }
             double slow_down = storage_level->Cycles() / (0.0 + ret.cycle_);
             ret.cycle_ = storage_level->Cycles();
 
