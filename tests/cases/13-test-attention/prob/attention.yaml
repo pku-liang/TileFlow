@@ -1,0 +1,63 @@
+problem:
+  io:
+    ins: Q, K, V
+    outs: O
+  dimensions: [B,H,M,N,A,L]
+  instance:
+    B: B
+    H: H
+    M: M 
+    N: N
+    A: A
+    L: L
+
+  ops:
+  - name: ProduceC
+    dimensions: [B,H,A,L,M]
+    data-spaces:
+    - name: C
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+      read-write: True
+    - name: K
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[A]]
+        - [[L]]
+    - name: Q
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[A]]
+    ins: K, Q
+    out: C
+    
+  - name: ProduceO
+    dimensions: [B,H,L,N,M]
+    data-spaces:
+    - name: O
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[N]]
+      read-write: True
+    - name: V
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[L]]
+        - [[N]]
+    - name: C
+      projection:
+        - [[B]]
+        - [[H]]
+        - [[M]]
+        - [[L]]
+    ins: C, V
+    out: O

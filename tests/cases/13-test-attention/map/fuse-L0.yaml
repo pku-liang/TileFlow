@@ -1,0 +1,81 @@
+mapping:
+  node-type: Tile
+  type: Temporal
+  factors: B=? H=? M=? L=?
+  permutation: LMHB
+  target: L2
+
+  subtree:
+  - node-type: Tile
+    type: Spatial
+    factors: B=? H=? M=?
+    permutation: MHB
+    target: L2
+    split: 1
+
+    subtree:
+    - node-type: Tile
+      type: Temporal
+      factors: M=? L=? B=? H=?
+      permutation: HBLM
+      target: L1
+
+      subtree:
+      - node-type: Scope
+        type: Sequential
+
+        subtree:
+        - node-type: Tile
+          type: Temporal
+          factors: A=?
+          permutation: A
+          target: L1
+          profile: False
+          bypass: [C]
+
+          subtree:
+          - node-type: Tile
+            type: Spatial
+            factors: M=16 L=16
+            permutation: LM
+            target: L1
+            split: 1
+            tag: op1
+
+            subtree:
+            - node-type: Tile
+              type: Temporal
+              factors: M=1 A=1 L=1
+              permutation: LAM
+              target: L0
+              tag: op1
+
+              subtree:
+              - node-type: Op
+                name: ProduceC
+        - node-type: Tile
+          type: Temporal
+          factors: N=?
+          permutation: N
+          target: L1
+          profile: False
+          bypass: [C]
+
+          subtree:
+          - node-type: Tile
+            type: Spatial
+            factors: M=16 L=16
+            permutation: LM
+            target: L1
+            split: 1
+
+            subtree:
+            - node-type: Tile
+              type: Temporal
+              factors: M=1 L=1 N=1
+              permutation: NLM
+              target: L0
+
+              subtree:
+              - node-type: Op
+                name: ProduceO

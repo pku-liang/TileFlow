@@ -1,0 +1,12 @@
+for b,h,m,l in (?,?,?,?): # target: L2  
+  scope Sequential
+    pfor b,h,m in (?,?,?): # target: L2, split:1
+      for m,l,a in (?,?,?): # target: L1 
+        pfor m,l in (?,?): # target: L1, split:1 
+          for m,a,l in (1,1,1): # target: L0 
+            op ProduceC
+    pfor b,h,m in (?,?,?): # target: L2, split:1
+      for m,l,n in (?,?,?): # target: L1
+        pfor m,l in (?,?):  # target: L1, split:1
+          for m,n,l in (1,1,1): # target: L0 
+            op ProduceO

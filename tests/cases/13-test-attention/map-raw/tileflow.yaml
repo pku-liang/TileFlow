@@ -1,0 +1,12 @@
+for b,h,m,l in (?,?,?,?): # target: L2  
+  pfor b,h,m in (?,?,?): # target: L2, split:1
+    for m,l,b,h in (?,?,?,?): # target: L1
+      scope Sequential
+        for a in (?): # target: L1, profile: False, bypass: [C]
+          pfor m,l in (?,?): # target: L1, split:1, tag: op1
+            for m,a,l in (1,1,1): # target: L0, tag: op1
+              op ProduceC
+        for n in (?): # target: L1, profile: False, bypass: [C]
+          pfor m,l in (?,?):  # target: L1, split:1
+            for m,l,n in (1,1,1): # target: L0 
+              op ProduceO

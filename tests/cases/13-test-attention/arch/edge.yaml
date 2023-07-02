@@ -1,0 +1,47 @@
+architecture:
+  version: 0.2
+  subtree:
+  - name: System
+    attributes:
+    local:
+    - name: L2
+      class: DRAM
+      attributes:
+        word-bits: 16
+        block-size: 32
+        technology: 16nm
+        read_bandwidth: 4
+        sizeKB: 1600000000
+    subtree:
+    - name: Buffer
+      attributes:
+      local:
+      - name: L1[0..3]
+        class: SRAM
+        attributes:
+          meshX: 2
+          meshY: 2
+          width: 16
+          word-bits: 16
+          technology: 16nm
+          read_bandwidth: 64
+          sizeKB: 64
+      subtree:
+      - name: PE
+        attributes:
+        local:
+        - name: L0[0..1023]
+          class: regfile
+          attributes:
+            depth: 1
+            meshX: 32
+            meshY: 32
+            word-bits: 16
+            block-size: 6
+            technology: 16nm
+            read_bandwidth: 3
+        - name: mac[0..1023]
+          class: intmac
+          attributes:
+            meshX: 32
+            meshY: 32
