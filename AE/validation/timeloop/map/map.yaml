@@ -1,0 +1,34 @@
+mapping:
+  node-type: Tile 
+  type: temporal 
+  factors: M = MO N = NO K= KO
+  permutation: KMN 
+  target: MainMemory 
+  
+    
+  subtree: 
+  - node-type: Tile 
+    type: temporal 
+    factors: M=MM K=KM N=NI
+    permutation: NMK
+    target: Cache
+
+    subtree:
+    - node-type: Tile 
+      type: spatial  
+      factors: M=16 K=16
+      permutation: MK
+      split: 1
+      target: Cache
+      multicast: true
+
+      subtree: 
+      - node-type: Tile 
+        type: temporal  
+        factors: M=1 N=1 K=1
+        permutation: MNK
+        target: RegFile
+        
+        subtree:
+        - node-type: Op
+          name: GEMM 

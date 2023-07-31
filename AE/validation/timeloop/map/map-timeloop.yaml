@@ -1,0 +1,25 @@
+mapping:
+  - node-type: Tile 
+    type: temporal 
+    factors: M = MO N = NO K= KO
+    permutation: KMN 
+    target: MainMemory 
+    
+  - node-type: Tile 
+    type: temporal 
+    factors: M=MM K=KM N=NI
+    permutation: NMK
+    target: Cache
+
+  - node-type: Tile 
+    type: spatial  
+    factors: M=16 K=16
+    permutation: MK
+    split: 1
+    target: Cache
+
+  - node-type: Tile 
+    type: temporal  
+    factors: N=1 M=1 K=1
+    permutation: MK
+    target: RegFile
