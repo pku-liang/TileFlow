@@ -1,0 +1,29 @@
+problem:
+  io:
+    ins: A, B
+    outs: C
+  dimensions: [M,N,K]
+  instance:
+    M: M
+    N: N
+    K: K
+
+  ops:
+  - name: GEMM
+    dimensions: [M,N,K] 
+    data-spaces:
+    - name: C 
+      projection:
+        - [[M]] 
+        - [[N]] 
+      read-write: True 
+    - name: A 
+      projection:
+        - [[M]]
+        - [[K]]
+    - name: B
+      projection:
+        - [[K]]
+        - [[N]]
+    ins: A, B
+    out: C
