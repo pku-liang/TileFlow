@@ -11,10 +11,9 @@ macro:
   # LO: 4
   # LM: 8
 
-
   SX: 16
   SY: 16   
 check:
   mem: False
-output: doublegemm
+output: self_attention
 verbose: 1
