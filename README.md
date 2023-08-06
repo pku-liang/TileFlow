@@ -11,12 +11,11 @@ sudo apt install scons libconfig++-dev libboost-dev libboost-iostreams-dev libbo
 
 2. install tileflow
 ```bash 
-git clone git@github.com:pku-liang/TileFlow.git
+git clone --recursive git@github.com:pku-liang/TileFlow.git
 cd TimeFlow
 export TILEFLOW_BASE=$(pwd)
 
 # build timeloop
-git submodule init --recursive
 cd 3rdparty/timeloop/src
 ln -s ../pat-public/src/pat .
 cd ..
