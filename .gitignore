@@ -2,3 +2,6 @@ bin/
 build/
 lib/
 *.o
+*.png
+*.txt
+*.pdf

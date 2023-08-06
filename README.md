@@ -12,7 +12,7 @@ sudo apt install scons libconfig++-dev libboost-dev libboost-iostreams-dev libbo
 2. install tileflow
 ```bash 
 git clone --recursive git@github.com:pku-liang/TileFlow.git
-cd TimeFlow
+cd TileFlow
 export TILEFLOW_BASE=$(pwd)
 
 # build timeloop
@@ -21,9 +21,9 @@ ln -s ../pat-public/src/pat .
 cd ..
 scons -j4 --static [--d] # --d for debug build
 
-cd $TILEFLOW_BASE
 
 # build tileflow 
+cd ../..
 scons -j4 --static [--d] 
 
 # add bin to path 
@@ -37,3 +37,5 @@ source ./setup-env.sh
 cd ./tests/cases/08-test-2mm # a sample input for 2mm.
 tileflow arch/* prob/* map/* # the order is not important
 ```
+
+4. Run tutorials in `tutorials`. Run validation experiment in `AE/validation`. 
