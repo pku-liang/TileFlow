@@ -19,12 +19,12 @@ export TILEFLOW_BASE=$(pwd)
 cd 3rdparty/timeloop/src
 ln -s ../pat-public/src/pat .
 cd ..
-scons -j4 --static [--d] # --d for debug build
+scons -j4 --static
 
 
 # build tileflow 
 cd ../..
-scons -j4 --static [--d] 
+scons -j4 --static
 
 # add bin to path 
 source ./setup-env.sh 
