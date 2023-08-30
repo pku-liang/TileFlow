@@ -1,0 +1,128 @@
+input file: arch/arch-spatial.yaml
+input file: prob/prob-2mm.yaml
+input file: map/map.yaml
+Begin ParseWorkload...
+Begin Spec...
+begin mapping by random...
+***Optimal Mapping:
+-----------------Nest Analysis----------------
+read: A B E D update: E 
+for L in [0:32), MainMemory
+  for M in [0:64), MainMemory
+      read: A B E D update: E fill: A B E D write-back: E 
+      Scope: Pipeline
+      {
+         read: C A B update: C fill: A B 
+         for L in [0:4) (Spatial-Y), MainMemory
+           for M in [0:2) (Spatial-X), MainMemory
+               read: C A B update: C fill: C A B write-back: C 
+               for K in [0:64), RegFile
+                 for L in [0:4), RegFile
+                   for M in [0:4), RegFile
+                        read: C A B update: C fill: C A B write-back: C 
+                        Op: GEMM1(A,B,)->C
+
+         read: E D update: E fill: E D write-back: E 
+         Scope: Sequential
+         {
+            read: C update: exp 
+            for L in [0:4) (Spatial-Y), MainMemory
+              for M in [0:2) (Spatial-X), MainMemory
+                  read: C update: exp fill: C write-back: exp 
+                  for L in [0:4), RegFile
+                    for M in [0:4), RegFile
+                        read: C update: exp fill: C write-back: exp 
+                        Op: EXP(C,)->exp
+
+            read: exp E D update: E fill: E D write-back: E 
+            for L in [0:4) (Spatial-Y), MainMemory
+              for M in [0:2) (Spatial-X), MainMemory
+                  read: exp E D update: E fill: exp E D write-back: E 
+                  for N in [0:64), RegFile
+                    for L in [0:4), RegFile
+                      for M in [0:4), RegFile
+                           read: exp E D update: E fill: exp E D write-back: E 
+                           Op: GEMM2(exp,D,)->E
+
+         }
+      }
+Cycle: 3178496, Energy: 1.06885e+09
+--------------END Nest Analysis---------------
+***TileFlow Result
+metric,value
+Cycle,3178496
+Energy,1.06885e+09
+MainMemory::Write::D, 0
+MainMemory::Fill::D, 0
+MainMemory::Update::D, 0
+MainMemory::Update, 1.04858e+06
+MainMemory::Read, 6.29146e+06
+MainMemory::Fill::E, 0
+MainMemory::Update::exp, 0
+MainMemory::CapUtil, 0.00012207
+MainMemory::Write, 1.04858e+06
+MainMemory::Update::B, 0
+MainMemory::Read::E, 1.04858e+06
+MainMemory::Update::C, 0
+MainMemory::Write::E, 1.04858e+06
+MainMemory::SpatialUtil, 1
+MainMemory::Read::C, 0
+MainMemory::Read::exp, 0
+MainMemory::Write::C, 0
+MainMemory::SlowDown, 1
+MainMemory::Accesses, 7.34003e+06
+MainMemory::Fill::exp, 0
+MainMemory::Energy, 7.34003e+08
+MainMemory::Write::B, 0
+MainMemory::Read::A, 1.04858e+06
+MainMemory::Update::A, 0
+MainMemory::Read::D, 2.09715e+06
+MainMemory::Fill, 0
+MainMemory::Fill::A, 0
+MainMemory::Write::exp, 0
+MainMemory::Fill::C, 0
+MainMemory::Write::A, 0
+MainMemory::Read::B, 2.09715e+06
+MainMemory::Fill::B, 0
+MainMemory::Update::E, 1.04858e+06
+RegFile::Write::D, 262144
+RegFile::Fill::D, 262144
+RegFile::Update::D, 0
+RegFile::Update, 4.22707e+06
+RegFile::Read, 1.26484e+07
+RegFile::Fill::E, 262144
+RegFile::Update::exp, 32768
+RegFile::CapUtil, 0.00402832
+RegFile::Write, 5.30842e+06
+RegFile::Update::B, 0
+RegFile::Read::E, 2.09715e+06
+RegFile::Update::C, 2.09715e+06
+RegFile::Write::E, 2.3593e+06
+RegFile::SpatialUtil, 0.5
+RegFile::Read::C, 2.16269e+06
+RegFile::Read::exp, 2.09715e+06
+RegFile::Write::C, 2.12992e+06
+RegFile::SlowDown, 1.5
+RegFile::Accesses, 1.43655e+08
+RegFile::Fill::exp, 0
+RegFile::Energy, 3.01026e+08
+RegFile::Write::B, 262144
+RegFile::Read::A, 2.09715e+06
+RegFile::Update::A, 0
+RegFile::Read::D, 2.09715e+06
+RegFile::Fill, 1.08134e+06
+RegFile::Fill::A, 262144
+RegFile::Write::exp, 32768
+RegFile::Fill::C, 32768
+RegFile::Write::A, 262144
+RegFile::Read::B, 2.09715e+06
+RegFile::Fill::B, 262144
+RegFile::Update::E, 2.09715e+06
+mac::Energy, 3.38166e+07
+mac::Flops, 3.38166e+07
+MEM::RegFile,0.00805664
+MEM::RegFile,0.000488281
+MEM::RegFile,0.00805664
+MEM::MainMemory,0.00012207
+SPATIAL::MainMemory,1
+***TileFlow Result Ends

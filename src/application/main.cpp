@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
   for (unsigned storage_level_id = 0; storage_level_id < arch_specs_.topology.NumStorageLevels();
    ++ storage_level_id){
     auto buffer = arch_specs_.topology.GetStorageLevel(storage_level_id);
-    TILEFLOW_COND_WARNING(buffer->size.Get(), "No memory size specified at " << buffer->name.Get());
+    TILEFLOW_COND_WARNING(buffer->size.IsSpecified(), "No memory size specified at " << buffer->name.Get());
     if (verbose_level) {
       std::cout << buffer->name.Get() << ": ";
       std::cout << buffer->size.Get() << "words" << std::endl;
